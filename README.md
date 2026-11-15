@@ -4,7 +4,7 @@ La integración consulta el estado de un servicio PiVigia activo. No recibe corr
 
 ## Instalación de la integración pública
 
-1. Descarga el repositorio público [pivigia_ha](https://github.com/Gente-del-Condado/pivigia-ha). La URL conserva su redirección al renombrarlo.
+1. Descarga el repositorio público [pivigia_ha](https://github.com/Gente-del-Condado/pivigia_ha).
 2. Copia **solo** `custom_components/pivigia/` a `config/custom_components/pivigia/` en Home Assistant, conservando su contenido.
 3. Reinicia Home Assistant.
 4. Abre **Ajustes → Dispositivos y servicios → Añadir integración → PiVigia**.
@@ -59,3 +59,14 @@ Usar `from: "off"` evita dispararla simplemente al pasar de no disponible a ence
 Copia la nueva carpeta de integración sobre la existente y reinicia Home Assistant. Conserva la configuración y no cambies los identificadores únicos del código. La actualización del complemento no reemplaza automáticamente esta carpeta.
 
 El ejemplo sigue los [disparadores de estado de Home Assistant](https://www.home-assistant.io/docs/automation/trigger/) y la acción oficial de [notificación persistente](https://www.home-assistant.io/integrations/persistent_notification/). Los requisitos de distribución se describen en [HACS](https://www.hacs.xyz/docs/publish/start/).
+
+## Origen de esta distribución
+
+El desarrollo completo se mantiene primero en el principal privado de
+[Forgejo](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia), después en su
+[espejo privado de GitHub](https://github.com/Gente-del-Condado/pivigia). Tras CI,
+Actions publica aquí solo la integración y sus metadatos, además de copiarla al
+[catálogo de componentes](https://github.com/Gente-del-Condado/Mis_componente_ha).
+El servidor se distribuye en
+[Mis_app_ha](https://github.com/Gente-del-Condado/Mis_app_ha). No hay publicadores
+que escriban de vuelta en Forgejo.
