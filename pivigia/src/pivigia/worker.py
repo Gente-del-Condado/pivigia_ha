@@ -1,6 +1,7 @@
 """Procesa la cola y persiste entregas parciales para reintentar destinos pendientes."""
 import json
 import logging
+import re
 import smtplib
 import ssl
 import threading
@@ -65,9 +66,47 @@ def delivery_description(error):
         return tr("El servidor SMTP rechazó las credenciales.")
     if isinstance(error, ssl.SSLError):
         return tls_error_description(error)
-    if isinstance(error, smtplib.SMTPRecipientsRefused):
-        return tr("El servidor SMTP rechazó el destinatario.")
+    if isinstance(error, (smtplib.SMTPSenderRefused, smtplib.SMTPRecipientsRefused)):
+        return smtp_refusal_description(error)
     return tr("No se pudo completar la entrega. Revisa la configuración y la conexión.")
+
+
+def _smtp_sender_refusal(code, response):
+    """Reconoce respuestas de Postfix sin copiar su contenido al diagnóstico."""
+    if not isinstance(code, int) or not 400 <= code <= 599:
+        return None
+    if not isinstance(response, (bytes, str)) or len(response) > 4096:
+        return None
+    if isinstance(response, bytes):
+        response = response.decode("ascii", errors="replace")
+    # smtpd_delay_reject puede aplazar el rechazo del remitente hasta RCPT TO.
+    # Ni 553 ni 5.7.1 bastan: también se usan para destinatarios y permisos de relay.
+    match = re.fullmatch(
+        r"[45]\.\d{1,3}\.\d{1,3} (?:<[^>\r\n]*>: )?"
+        r"Sender address rejected: (?P<reason>[^\r\n]+)", response, re.IGNORECASE,
+    )
+    if not match:
+        return None
+    reason = match["reason"].lower()
+    if reason.startswith("not owned by user ") or reason == "not logged in":
+        return "unauthorized"
+    return "sender"
+
+
+def smtp_refusal_description(error, *, test=False):
+    """Comparte mensajes propios entre prueba e historial, sin exponer datos SMTP."""
+    if isinstance(error, smtplib.SMTPSenderRefused):
+        reasons = [_smtp_sender_refusal(error.smtp_code, error.smtp_error) or "sender"]
+    else:
+        reasons = [_smtp_sender_refusal(code, response) for code, response in error.recipients.values()]
+    # Con varios destinos, solo atribuir todo el fallo al remitente si cada respuesta lo confirma.
+    if reasons and all(reason == "unauthorized" for reason in reasons):
+        return tr("El servidor SMTP no autoriza el remitente. Usa la dirección de la cuenta con la que te autenticas o un alias autorizado para ella.")
+    if reasons and all(reason is not None for reason in reasons):
+        return tr("El servidor SMTP rechazó el remitente. Revisa su dirección y los permisos de envío de la cuenta SMTP.")
+    if test:
+        return tr("El servidor rechazó el destinatario de prueba.")
+    return tr("El servidor SMTP rechazó el destinatario.")
 
 
 class ShutdownRequested(Exception):

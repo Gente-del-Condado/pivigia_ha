@@ -1,5 +1,11 @@
 # Historial de versiones
 
+## 0.2.2 — Remitente SMTP no autorizado
+
+- La prueba de correo y el historial distinguen un remitente no autorizado de un destinatario rechazado, incluso cuando Postfix aplaza la comprobación del remitente hasta `RCPT TO`.
+- El diagnóstico indica que se debe usar la dirección de la cuenta autenticada o un alias autorizado. Otros rechazos del remitente conservan un mensaje propio sin atribuirles una causa no confirmada.
+- Mensajes en español e inglés y registro seguro en el idioma del servicio, sin publicar direcciones, usuarios ni respuestas privadas del proveedor. Se conservan transporte TLS, autenticación y reintentos.
+
 ## 0.2.1 — Acerca de y diagnóstico TLS
 
 - Nueva sección «Acerca de» con desarrollador, contacto y versión, accesible también en modo de solo consulta.

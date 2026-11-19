@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from .config import Mailbox, email_address
 from .notifications import prepare_images
-from .worker import Worker, tls_error_description
+from .worker import Worker, smtp_refusal_description, tls_error_description
 from .i18n import service_language, tr, use_language
 
 log = logging.getLogger(__name__)
@@ -57,8 +57,10 @@ def send_test_email(settings, test):
         with use_language(service_language(settings.language)):
             log.warning(tr("Prueba de correo fallida: %s"), tls_error_description(error))
         raise ValueError(tls_error_description(error)) from None
-    except smtplib.SMTPRecipientsRefused:
-        raise ValueError(tr("El servidor rechazó el destinatario de prueba.")) from None
+    except (smtplib.SMTPSenderRefused, smtplib.SMTPRecipientsRefused) as error:
+        with use_language(service_language(settings.language)):
+            log.warning(tr("Prueba de correo fallida: %s"), smtp_refusal_description(error, test=True))
+        raise ValueError(smtp_refusal_description(error, test=True)) from None
     except Exception:
         raise ValueError(
             tr("No se pudo enviar. Revisa el servidor SMTP de salida, puerto, seguridad, remitente y conexión.")

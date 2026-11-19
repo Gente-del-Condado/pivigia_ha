@@ -34,6 +34,12 @@ El [diagnóstico TLS](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia/src
 las otras causas y sus mensajes. Desde 0.2.1, los fallos TLS de la prueba dejan
 un motivo en **Registro**, sin credenciales ni respuestas privadas del servidor.
 
+Desde 0.2.2, si aparece **El servidor SMTP no autoriza el remitente**, usa como
+**Remitente** la dirección de la cuenta con la que te autenticas o un alias
+autorizado para ella. Ese rechazo puede llegar al comprobar el destinatario:
+no significa que su dirección sea incorrecta. Consulta los
+[mensajes de rechazo SMTP](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia/src/branch/main/docs/PROBLEMAS.md#remitente-no-autorizado-o-destinatario-rechazado).
+
 ## Acerca de y donativos
 
 En el menú lateral del portal, **Acerca de** muestra la versión instalada, el
