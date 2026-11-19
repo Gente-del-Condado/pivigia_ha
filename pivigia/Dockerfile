@@ -12,7 +12,7 @@ COPY src ./src
 COPY run.py ./run.py
 RUN pip install --no-cache-dir --no-deps .
 ARG BUILD_ARCH=aarch64
-ARG BUILD_VERSION=0.2.2
+ARG BUILD_VERSION=0.3.0
 LABEL io.hass.type="app" io.hass.version="${BUILD_VERSION}" io.hass.arch="${BUILD_ARCH}"
 EXPOSE 2525 8099
 CMD ["python", "run.py"]

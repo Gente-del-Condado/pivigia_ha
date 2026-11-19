@@ -49,7 +49,8 @@ class Handler:
             username = auth_data.login.decode().lower()
             password = auth_data.password.decode()
             box = next(
-                (b for b in self.store.settings().mailboxes if b.address == username and b.enabled), None
+                (b for b in self.store.settings().mailboxes
+                 if b.address == username and b.enabled and b.source == "local"), None
             )
             valid = box is not None and check_password(password, box.password)
         except (UnicodeError, ValueError):
@@ -60,7 +61,8 @@ class Handler:
 
     async def handle_RCPT(self, server, session, envelope, address, rcpt_options):
         box = next(
-            (b for b in self.store.settings().mailboxes if b.address == address.lower() and b.enabled), None
+            (b for b in self.store.settings().mailboxes
+             if b.address == address.lower() and b.enabled and b.source == "local"), None
         )
         if box is None:
             return tr("550 Buzón no disponible")
@@ -81,7 +83,10 @@ class Handler:
             envelope.mail_from,
             envelope.original_content,
             self.store.settings().queue_limit,
+            local_only=True,
         )
+        if accepted is None:
+            return tr("550 Buzón no disponible")
         return tr("250 Encolado en PiVigia") if accepted else tr("452 Cola llena; reintenta más tarde")
 
 

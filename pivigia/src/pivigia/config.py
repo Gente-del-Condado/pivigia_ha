@@ -6,9 +6,11 @@ import re
 import secrets
 from pathlib import Path
 from urllib.parse import urlsplit
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator, field_validator
 from .i18n import tr, match_language
+from .mail_accounts import ExternalMailbox
 
 # Solo códecs raster para fotos; no habilitar intérpretes externos como Ghostscript.
 IMAGE_FORMATS = ("JPEG", "PNG", "GIF", "WEBP", "BMP", "TIFF")
@@ -16,7 +18,9 @@ IMAGE_FORMATS = ("JPEG", "PNG", "GIF", "WEBP", "BMP", "TIFF")
 
 class Mailbox(BaseModel):
     address: str
-    password: str = Field(min_length=8, max_length=200)
+    password: str = Field(default="", max_length=200, repr=False)
+    source: Literal["local", "imap"] = "local"
+    external: ExternalMailbox | None = None
     destinations: list[str] = Field(default_factory=list, max_length=20)
     telegram_chat_ids: list[str] = Field(default_factory=list, max_length=10)
     categories: list[str] = Field(default_factory=lambda: ["person", "car", "animal"])
@@ -28,6 +32,14 @@ class Mailbox(BaseModel):
 
     @model_validator(mode="after")
     def check_inverse_rule(self):
+        if self.source == "local" and len(self.password) < 8:
+            raise ValueError(tr("La contraseña del buzón local necesita al menos 8 caracteres."))
+        if self.source == "imap" and self.external is None:
+            raise ValueError(tr("Configura la cuenta externa del buzón."))
+        if self.source == "local":
+            self.external = None
+        else:
+            self.password = ""
         if self.invert_detection and (self.forward_all or not self.categories):
             raise ValueError(tr("Para invertir la detección, selecciona alguna categoría y desactiva el reenvío de todos los mensajes."))
         return self
@@ -163,6 +175,8 @@ class Settings(BaseModel):
             self.smtp_from = email_address(self.smtp_from)
         if len({b.address for b in self.mailboxes}) != len(self.mailboxes):
             raise ValueError(tr("Hay buzones duplicados"))
+        if sum(b.source == "imap" for b in self.mailboxes) > 10:
+            raise ValueError(tr("Se permiten hasta 10 cuentas externas."))
         if len({camera.id for camera in self.cameras}) != len(self.cameras):
             raise ValueError(tr("Hay cámaras duplicadas"))
         addresses = {box.address for box in self.mailboxes}

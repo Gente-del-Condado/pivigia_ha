@@ -524,10 +524,11 @@
             <div class="card">
               <div class="row">
                 <h2><span data-i18n="Buzones de entrada">Buzones de entrada</span></h2>
-                <button type="button" id="add-box"><span data-i18n="+ Añadir buzón">+ Añadir buzón</span></button>
+                <button type="button" id="add-box"><span data-i18n="+ Recepción directa">+ Recepción directa</span></button>
+                <button type="button" id="add-external"><span data-i18n="+ Cuenta externa">+ Cuenta externa</span></button>
               </div>
               <p class="hint">
-                <span data-i18n="Cada buzón es una dirección de entrada dentro de PiVigia, por ejemplo patio@pivigia.local; no necesitas comprar un dominio. La cámara enviará a la IP de PiVigia y al puerto SMTP de entrada (2525 inicialmente). Usa la dirección del buzón como usuario y destinatario. Los destinatarios de las alertas se indican en «Reenviar a».">Cada buzón es una dirección de entrada dentro de PiVigia, por ejemplo patio@pivigia.local; no necesitas comprar un dominio. La cámara enviará a la IP de PiVigia y al puerto SMTP de entrada (2525 inicialmente). Usa la dirección del buzón como usuario y destinatario. Los destinatarios de las alertas se indican en «Reenviar a».</span>
+                <span data-i18n="Recepción directa: tu cámara envía a PiVigia por SMTP. Cuenta externa: PiVigia consulta Gmail, Hotmail u otro buzón por IMAP seguro. Ambos aplican las mismas reglas y destinos. No se borran correos ni se marcan como leídos; al activar una cuenta se empieza desde los mensajes nuevos.">Recepción directa: tu cámara envía a PiVigia por SMTP. Cuenta externa: PiVigia consulta Gmail, Hotmail u otro buzón por IMAP seguro. Ambos aplican las mismas reglas y destinos. No se borran correos ni se marcan como leídos; al activar una cuenta se empieza desde los mensajes nuevos.</span>
               </p>
               <div id="boxes"></div>
             </div>
@@ -672,7 +673,7 @@
       }
       let configurationDirty = false;
       document.querySelectorAll("#configuration, #server-form, #email-test-form").forEach(form => form.addEventListener("input", () => { configurationDirty = true; }));
-      document.querySelectorAll("#add-box, #add-camera").forEach(button => button.addEventListener("click", () => { configurationDirty = true; }));
+      document.querySelectorAll("#add-box, #add-external, #add-camera").forEach(button => button.addEventListener("click", () => { configurationDirty = true; }));
       document.getElementById("language-locked").classList.toggle("hidden", !i18nData.language_locked);
       for (const picker of document.querySelectorAll("[data-language-picker], #service-language")) {
         for (const [code, catalog] of Object.entries(catalogs)) {
@@ -796,12 +797,11 @@
         }
         const body = await r.json();
         if (r.status === 401 && identity) showLogin(t("La sesión ya no es válida. Vuelve a entrar."));
-        if (!r.ok)
-          throw Error(
-            typeof body.detail === "string"
-              ? body.detail
-              : t("No se ha podido completar la operación"),
-          );
+        if (!r.ok) {
+          const error = Error(typeof body.detail === "string" ? body.detail : t("No se ha podido completar la operación"));
+          error.status = r.status;
+          throw error;
+        }
         return body;
       }
       const analysis = [
@@ -877,7 +877,9 @@
         config.mailboxes.forEach((box, i) => {
           const card = node("div", undefined, "box");
           const header = node("div", undefined, "row");
-          header.append(node("h3", t("Buzón {number}", {number: i + 1})));
+          header.append(node("h3", t("Buzón {number}", {number: i + 1}) + " · " + (box.source === "imap" ? t("Cuenta externa") : t("Recepción directa"))));
+          card.dataset.source = box.source || "local";
+          card.dataset.address = box.address;
           const del = node("button", t("Eliminar"), "danger");
           del.type = "button";
           del.onclick = () => { configurationDirty = true;
@@ -895,13 +897,13 @@
             box.address,
             "email",
           ).required = true;
-          field(
-            grid,
-            "password",
-            t("Contraseña SMTP (mínimo 8 caracteres)"),
-            box.password,
-            "password",
-          ).required = true;
+          if (box.source === "imap") grid.querySelector("small")?.remove();
+          if (box.source === "imap") renderExternal(card, box, i);
+          else {
+            const password = field(grid, "password", t("Contraseña SMTP (mínimo 8 caracteres)"), box.password, "password");
+            password.required = true;
+            password.minLength = 8;
+          }
           field(
             grid,
             "destinations",
@@ -956,14 +958,149 @@
           parent.append(card);
         });
       }
+      // Los secretos OAuth solo viven en el servidor; el panel conserva pruebas efímeras en memoria.
+      const mailFlows = new Map();
+      function choice(parent, key, title, value, options) {
+        const label = node("label", title), select = node("select");
+        select.name = "external_" + key;
+        select.dataset.external = key;
+        for (const [v, text] of options) select.add(new Option(text, v));
+        select.value = value;
+        label.append(select); parent.append(label);
+        return select;
+      }
+      function renderExternal(card, box, index) {
+        const account = box.external, grid = node("div", undefined, "grid");
+        const input = (parent, key, title, type = "text") => {
+          const element = field(parent, "external_" + key, title, account[key], type);
+          element.dataset.external = key;
+          if (type === "password") element.autocomplete = "new-password";
+          return element;
+        };
+        const provider = choice(grid, "provider", t("Proveedor"), account.provider, [
+          ["gentedelcondado", "Gente del Condado"], ["gmail", "Gmail"], ["outlook", "Outlook / Hotmail"], ["custom", t("Otro servidor IMAP")]]);
+        provider.onchange = () => {
+          readBoxes(); configurationDirty = true;
+          const a = config.mailboxes[index].external;
+          Object.assign(a, {host: {gmail: "imap.gmail.com", outlook: "outlook.office365.com", gentedelcondado: "mail.gentedelcondado.es"}[a.provider] || "",
+            port: 993, password: "", client_id: "", client_secret: "", authorization_endpoint: "", token_endpoint: "", scope: "",
+            auth: ["gmail", "outlook"].includes(a.provider) ? "oauth2" : "password"});
+          renderBoxes();
+        };
+        const user = input(grid, "username", t("Usuario de la cuenta externa")); user.required = true;
+        user.autocomplete = "username";
+        input(grid, "host", t("Servidor IMAP (TLS verificado)")).readOnly = account.provider !== "custom";
+        const port = input(grid, "port", t("Puerto IMAP"), "number"); port.max = "65535"; port.readOnly = account.provider !== "custom";
+        input(grid, "folder", t("Carpeta IMAP")).required = true;
+        const interval = input(grid, "interval", t("Consultar cada (segundos)"), "number"); interval.min = "30"; interval.max = "3600";
+        const auth = choice(grid, "auth", t("Acceso a la cuenta"), account.auth,
+          account.provider === "outlook" ? [["oauth2", "OAuth2"]] : [["oauth2", "OAuth2"], ["password", t("Contraseña / contraseña de aplicación")]]);
+        auth.onchange = () => { readBoxes(); config.mailboxes[index].external.password = ""; configurationDirty = true; renderBoxes(); };
+        card.append(grid);
+        if (account.auth === "password") {
+          input(grid, "password", t("Contraseña de la cuenta externa"), "password");
+          card.append(node("p", account.provider === "gmail"
+            ? t("Gmail: usa una contraseña de aplicación con verificación en dos pasos, si tu cuenta lo permite. Nunca la contraseña habitual.")
+            : t("El usuario y la contraseña pertenecen al proveedor. En Gente del Condado puedes usar el usuario de tu buzón. TLS siempre verifica el certificado."), "hint"));
+        } else {
+          const details = node("details");
+          details.open = !account.client_id;
+          details.append(node("summary", t("Configurar OAuth2")));
+          const oauthGrid = node("div", undefined, "grid");
+          input(oauthGrid, "client_id", t("ID de cliente OAuth2"));
+          if (account.provider !== "outlook") {
+            input(oauthGrid, "client_secret", t("Secreto de cliente (si lo exige el proveedor)"), "password");
+            input(oauthGrid, "redirect_uri", t("URL de retorno HTTPS"));
+            if (!["gmail", "outlook"].includes(account.provider)) {
+              input(oauthGrid, "authorization_endpoint", t("URL de autorización OAuth2"));
+              input(oauthGrid, "token_endpoint", t("URL de tokens OAuth2"));
+              input(oauthGrid, "scope", t("Permisos OAuth2 (scope)"));
+            }
+          }
+          details.append(oauthGrid, node("p", account.provider === "outlook"
+            ? t("Registra una aplicación Microsoft para cuentas personales y habilita los flujos de cliente público. Introduce su ID; conectarás con un código sin publicar puertos ni una URL de retorno.")
+            : t("Registra tu propio cliente en el proveedor y copia exactamente la URL de retorno HTTPS. El manual explica Gmail, Ingress y servidores propios. El servidor debe admitir XOAUTH2 y PKCE S256."), "hint"));
+          card.append(details);
+        }
+        const actions = node("div", undefined, "row");
+        const result = node("div", "", "result"); result.dataset.mailResult = box.address;
+        result.setAttribute("role", "status"); result.setAttribute("aria-live", "polite");
+        const action = (title, command) => {
+          const button = node("button", title); button.type = "button";
+          button.onclick = async () => {
+            if (configurationDirty) { notice(t("Guarda los cambios antes de probar o conectar esta cuenta."), true); return; }
+            if (command === "reset" && !confirm(t("Se omitirán los mensajes pendientes del proveedor. Los ya importados se conservan. ¿Empezar desde ahora?"))) return;
+            button.disabled = true;
+            try {
+              const response = await api("mailboxes/" + encodeURIComponent(box.address) + "/" + command,
+                {method: "POST", timeoutMs: 75000, ...(command === "reset" ? {body: '{"confirm":true}'} : {})});
+              if (command === "oauth/start") {
+                const link = node("a", t("Abrir autorización del proveedor"));
+                link.href = response.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+                result.replaceChildren(link);
+                if (response.user_code) result.append(node("p", t("Introduce este código: {code}", {code: response.user_code})));
+                result.append(node("p", t("Autoriza solo la cuenta prevista y vuelve a este panel. No compartas el código.")));
+                mailFlows.set(box.address, {flow: response.flow, proof: response.proof, until: Date.now() + 600000});
+              } else {
+                if (command === "oauth/disconnect") mailFlows.delete(box.address);
+                result.textContent = response.detail;
+              }
+            } catch (error) { result.textContent = error.message; }
+            finally { button.disabled = false; }
+          };
+          actions.append(button);
+        };
+        action(t("Probar conexión"), "test");
+        if (account.auth === "oauth2") {
+          action(t("Conectar con OAuth2"), "oauth/start");
+          action(t("Desconectar OAuth2"), "oauth/disconnect");
+        }
+        action(t("Empezar desde ahora"), "reset");
+        card.append(actions, result);
+        const status = node("p", t("Guarda y prueba la conexión antes de activar la cuenta."), "hint");
+        status.dataset.mailStatus = box.address; card.append(status);
+      }
+      let mailRefreshBusy = false;
+      async function refreshMail() {
+        if (!identity?.can_admin || mailRefreshBusy) return;
+        mailRefreshBusy = true;
+        try {
+          for (const [address, flow] of mailFlows) {
+            const result = [...document.querySelectorAll("[data-mail-result]")].find(n => n.dataset.mailResult === address);
+            if (!result || Date.now() > flow.until) {
+              mailFlows.delete(address);
+              if (result) result.textContent = t("La autorización ha caducado o cambió la configuración. Vuelve a conectar la cuenta.");
+              continue;
+            }
+            try {
+              const response = await api("mailboxes/" + encodeURIComponent(address) + "/oauth/finish",
+                {method: "POST", body: JSON.stringify({flow: flow.flow, proof: flow.proof}), timeoutMs: 30000});
+              if (response.status !== "pending") { mailFlows.delete(address); result.textContent = response.detail; }
+            } catch (error) {
+              if (error.status !== 409) { mailFlows.delete(address); result.textContent = error.message; }
+            }
+          }
+          const statuses = await api("mailboxes/external");
+          for (const item of statuses) {
+            const target = [...document.querySelectorAll("[data-mail-status]")].find(n => n.dataset.mailStatus === item.address);
+            if (target) target.textContent = item.detail + " · " + t("Importados: {imported}; omitidos: {skipped}", item)
+              + (item.checked ? " · " + t("Última consulta: {time}", {time: new Date(item.checked * 1000).toLocaleString(language)}) : "");
+          }
+        } catch (error) { /* La supervisión general ya informa de las desconexiones del panel. */ }
+        finally { mailRefreshBusy = false; }
+      }
       function readBoxes() {
-        config.mailboxes = [...$("boxes").children].map((card) => {
+        config.mailboxes = [...$("boxes").children].map((card, index) => {
           const val = (n) => card.querySelector('[name="' + n + '"]').value;
           const checked = (n) =>
             card.querySelector('[name="' + n + '"]').checked;
           return {
             address: val("address"),
-            password: val("password"),
+            source: card.dataset.source,
+            password: card.dataset.source === "imap" ? "" : val("password"),
+            external: card.dataset.source === "imap" ? {...config.mailboxes[index].external, ...Object.fromEntries(
+              [...card.querySelectorAll("[data-external]")].map(input => [input.dataset.external,
+                input.type === "number" ? Number(input.value) : input.value]))} : null,
             destinations: val("destinations")
               .split(",")
               .map((v) => v.trim())
@@ -1192,6 +1329,7 @@
       };
       $("ha-login-button").onclick = () => { token = ""; login(); };
       $("logout").onclick = () => {
+        mailFlows.clear();
         const wasHA = identity?.provider === "homeassistant";
         sessionStorage.setItem(signoutStorageKey, "1");
         showLogin(wasHA ? t("Has salido del panel. Tu sesión de Home Assistant sigue activa; puedes cerrarla desde Home Assistant.") : t("Sesión del panel cerrada."));
@@ -1267,6 +1405,17 @@
           enabled: true,
           forward_all: false,
         });
+        renderBoxes();
+      };
+      $("add-external").onclick = () => {
+        readBoxes(); configurationDirty = true;
+        config.mailboxes.push({source: "imap", address: "", password: "", enabled: false,
+          destinations: [], telegram_chat_ids: [], categories: ["person", "car", "animal"], confidence: .5,
+          forward_all: false, invert_detection: false,
+          external: {provider: "gentedelcondado", host: "mail.gentedelcondado.es", port: 993,
+            username: "", password: "", folder: "INBOX", interval: 60, auth: "password",
+            client_id: "", client_secret: "", redirect_uri: location.protocol === "https:" ? new URL("oauth/callback", location.href).href : "",
+            authorization_endpoint: "", token_endpoint: "", scope: ""}});
         renderBoxes();
       };
       $("configuration").onsubmit = async (e) => {
@@ -1651,7 +1800,7 @@
 
       setInterval(refreshCameras, 2000);
       setInterval(() => {
-        if (!$("app").classList.contains("hidden")) refresh();
+        if (!$("app").classList.contains("hidden")) { refresh(); refreshMail(); }
       }, 15000);
       initializeLogin();
     </script>

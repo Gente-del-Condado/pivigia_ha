@@ -20,6 +20,9 @@ from .streams import StreamManager
 from .diagnostics import TestEmail, analyze_image, send_test_email
 from .server import ENV_FIELDS, ServerSettings, deployment
 from .auth import AuthPolicy
+from .mail_accounts import restore_secrets
+from .mail_reader import MailReader
+from .mail_api import install_mail_routes
 from . import __version__
 from .i18n import (N_, tr, browser_catalogs, current_language, negotiate_language,
                    service_language, set_service_language, translate_saved, use_language)
@@ -47,6 +50,7 @@ def create_app(store=None, start_services=True, server_settings=None):
     worker = Worker(store)
     models = worker.detector.models
     streams = StreamManager(store, worker.detector)
+    mail_reader = MailReader(store)
     test_lock = threading.Lock()
     auth_policy = AuthPolicy()
 
@@ -57,9 +61,11 @@ def create_app(store=None, start_services=True, server_settings=None):
             controller = await asyncio.to_thread(start_smtp, store, running)
             worker.start()
             streams.start()
+            mail_reader.start()
         try:
             yield
         finally:
+            await asyncio.to_thread(mail_reader.stop)
             await asyncio.to_thread(models.stop)
             await asyncio.to_thread(streams.stop)
             if controller:
@@ -74,6 +80,8 @@ def create_app(store=None, start_services=True, server_settings=None):
     app.state.models = models
     app.state.streams = streams
     app.state.auth_policy = auth_policy
+    app.state.mail_reader = mail_reader
+    install_mail_routes(app, mail_reader)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request, error):
@@ -292,7 +300,10 @@ def create_app(store=None, start_services=True, server_settings=None):
         result["smtp_password"] = MASK if result["smtp_password"] else ""
         result["telegram_bot_token"] = MASK if result["telegram_bot_token"] else ""
         for box in result["mailboxes"]:
-            box["password"] = MASK
+            box["password"] = MASK if box["source"] == "local" else ""
+            if box["external"]:
+                for key in ("password", "client_secret"):
+                    box["external"][key] = MASK if box["external"][key] else ""
         for camera in result["cameras"]:
             camera["url"] = MASK
         return result
@@ -323,8 +334,12 @@ def create_app(store=None, start_services=True, server_settings=None):
                 settings.telegram_bot_token = old.telegram_bot_token
             existing = {b.address: b for b in old.mailboxes}
             for box in settings.mailboxes:
+                previous = existing.get(box.address)
+                if box.source == "imap":
+                    restore_secrets(box.external, previous.external if previous else None, MASK)
+                    continue
                 if box.password == MASK:
-                    if box.address not in existing:
+                    if not previous or previous.source != "local":
                         raise ValueError(tr("Indica la contraseña del nuevo buzón"))
                     box.password = existing[box.address].password
                 else:
@@ -336,7 +351,7 @@ def create_app(store=None, start_services=True, server_settings=None):
             # Los errores de Pydantic incluyen entradas; no devolver secretos al cliente.
             raise HTTPException(
                 422,
-                tr("Revisa las direcciones, contraseñas (mínimo 8 caracteres), categorías, límites, cámaras RTSP y ajustes de Telegram (token e IDs de chat)"),
+                tr("Revisa las direcciones, contraseñas locales (mínimo 8 caracteres), cuentas IMAP/OAuth2, categorías, límites, cámaras y Telegram. Si cambias un servidor o identidad, introduce de nuevo sus credenciales."),
             ) from None
         return {"ok": True}
 

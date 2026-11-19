@@ -196,3 +196,18 @@ Consulta [Copias](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia/src/bra
 ## AppArmor
 
 Desde 0.1.9 se incluye un [perfil propio](APPARMOR.md) en modo enforce. Conserva SMTP/STARTTLS, RTSP, modelos, avisos e Ingress; no requiere desactivar la protección. Solo escribe en los datos y temporales del servicio. Los certificados opcionales de `/ssl` siguen siendo de solo lectura.
+
+
+## Cuentas de correo externas (0.3.0)
+
+En **Buzones**, «Recepción directa» conserva el SMTP local de tus cámaras y «Cuenta externa» consulta un buzón existente. Gmail, Outlook/Hotmail y Gente del Condado tienen servidor preconfigurado, TLS obligatorio y las mismas reglas de análisis y avisos. No abras puertos entrantes para IMAP: el complemento inicia la conexión saliente.
+
+1. Añade la cuenta externa desactivada, configura usuario y acceso y guarda.
+2. Con OAuth2, conecta la cuenta; después usa «Probar conexión».
+3. Actívala, guarda y espera «Seguimiento iniciado» antes de enviar una foto nueva.
+
+Outlook/Hotmail usa OAuth2 por código y funciona desde Ingress con tu propio ID de cliente Microsoft. Gmail permite contraseña de aplicación o OAuth2 con tu cliente Google y un callback HTTPS estable; una ruta temporal de Ingress no basta para registrar ese callback. El manual explica paso a paso el registro y las alternativas: [buzones externos y OAuth2](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia/src/branch/main/docs/BUZONES.md#anadir-una-cuenta-externa).
+
+Se consulta INBOX cada 60 segundos inicialmente. No se importa el historial inicial, no se marcan correos como leídos y no se borran. La cola llena se reintenta. Los mensajes mayores de 15 MB se omiten con aviso. No se permiten servidores IMAP que resuelvan a IP privadas ni desactivar la validación del certificado.
+
+La copia de seguridad del complemento debe conservar todo `/data`, incluida la clave `mail-secrets.key`. El idioma del servicio controla sus logs; el idioma del panel controla formularios y errores. La conexión real a tu cuenta y la aceptación de sus permisos se completan al configurarla: PiVigia no incluye credenciales OAuth compartidas.

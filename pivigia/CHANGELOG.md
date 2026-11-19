@@ -1,5 +1,14 @@
 # Historial de versiones
 
+## 0.3.0 — 2026-11-20
+
+- Buzones de recepción directa SMTP y cuentas externas IMAP con las mismas reglas, análisis y destinos. Perfiles Gmail, Outlook/Hotmail, Gente del Condado y servidor propio.
+- OAuth2: Google/genérico con PKCE y callback HTTPS; Microsoft personal mediante código de dispositivo compatible con Ingress. Renovación de tokens en servidor, credenciales externas cifradas y conservación segura de secretos enmascarados.
+- TLS obligatorio, protección contra destinos internos/DNS rebinding, límites de red/MIME, lectura sin marcar ni borrar y cursor transaccional junto a la cola.
+- Formulario guiado, pruebas de conexión, estados, contadores y errores en español/inglés. Documentación de registro OAuth, Home Assistant, copias y extensibilidad.
+- La primera conexión importa solo mensajes nuevos. No incluye clientes OAuth compartidos ni configura proveedores remotos: el propietario registra su cliente y autoriza la cuenta. Las pruebas automatizadas usan servidores y credenciales sintéticos.
+
+
 ## 0.2.2 — Remitente SMTP no autorizado
 
 - La prueba de correo y el historial distinguen un remitente no autorizado de un destinatario rechazado, incluso cuando Postfix aplaza la comprobación del remitente hasta `RCPT TO`.
