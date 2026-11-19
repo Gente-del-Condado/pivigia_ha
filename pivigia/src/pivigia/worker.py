@@ -38,6 +38,25 @@ def parse_message(raw):
     return BytesParser(policy=policy.default.clone(message_factory=factory)).parsebytes(raw)
 
 
+def tls_error_description(error):
+    """Traduce códigos X.509 de OpenSSL sin copiar nombres ni mensajes del proveedor."""
+    if isinstance(error, ssl.SSLCertVerificationError):
+        code = getattr(error, "verify_code", None)
+        # X509_V_ERR_HOSTNAME_MISMATCH e IP_ADDRESS_MISMATCH: nunca aceptar otro nombre.
+        if code in {62, 64}:
+            return tr("El certificado TLS no corresponde al nombre del servidor configurado. Usa el nombre SMTP indicado por tu proveedor o corrige el certificado del servidor.")
+        if code == 9:
+            return tr("El certificado TLS todavía no es válido. Revisa la fecha y hora del equipo y la vigencia del certificado del servidor.")
+        if code == 10:
+            return tr("El certificado TLS ha caducado. Revisa la fecha y hora del equipo y renueva el certificado del servidor.")
+        if code in {18, 19}:
+            return tr("La cadena TLS contiene un certificado autofirmado que no es de confianza. Configura un certificado emitido por una autoridad de confianza en el servidor.")
+        if code in {2, 20, 21}:
+            return tr("No se pudo verificar la cadena del certificado TLS. Revisa los certificados intermedios del servidor y las autoridades de confianza del contenedor.")
+        return tr("No se pudo verificar el certificado TLS. Revisa su nombre, vigencia y cadena de confianza; no desactives la verificación.")
+    return tr("No se pudo establecer la conexión TLS. Revisa el puerto y la seguridad: normalmente SSL/TLS directo usa 465 y STARTTLS usa 587.")
+
+
 def delivery_description(error):
     """Solo los errores construidos por PiVigia pueden aportar texto al historial."""
     if isinstance(error, (DeliveryError, TelegramError)):
@@ -45,7 +64,7 @@ def delivery_description(error):
     if isinstance(error, smtplib.SMTPAuthenticationError):
         return tr("El servidor SMTP rechazó las credenciales.")
     if isinstance(error, ssl.SSLError):
-        return tr("No se pudo establecer una conexión TLS segura.")
+        return tls_error_description(error)
     if isinstance(error, smtplib.SMTPRecipientsRefused):
         return tr("El servidor SMTP rechazó el destinatario.")
     return tr("No se pudo completar la entrega. Revisa la configuración y la conexión.")

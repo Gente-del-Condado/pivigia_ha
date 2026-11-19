@@ -302,6 +302,19 @@
         .result { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; padding: 1rem; border: 1px solid var(--border); background: var(--raised); border-radius: .5rem; margin-block-start: 1rem; }
         .preview { display: block; max-inline-size: 100%; max-block-size: 31.25rem; border-radius: .5rem; margin-block-start: 1rem; }
         .hint { font-size: .75rem; }
+        .about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr)); gap: 1.25rem; align-items: start; }
+        .about-details { margin: 1.5rem 0 0; }
+        .about-details > div { padding-block: .8rem; border-block-start: 1px solid var(--border); }
+        .about-details dt { color: var(--muted); font-size: .75rem; }
+        .about-details dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+        .support-link {
+          display: inline-flex; align-items: center; justify-content: center; gap: .65rem;
+          min-block-size: 2.75rem; max-inline-size: 100%; padding: .8rem 1.1rem;
+          border: 1px solid #72a4f2; border-radius: .5rem; background: #72a4f2;
+          color: #11233e; font-weight: 650; text-decoration: none; overflow-wrap: anywhere;
+        }
+        .support-link:hover { background: #93b9f6; border-color: #93b9f6; }
+        .support-link .icon { flex-shrink: 0; }
         .wide { grid-column: 1 / -1; }
         @media (max-width: 50rem) { .login-intro .radar { display: none; } }
         #save-bar { position: sticky; inset-block-end: 1rem; padding: 1rem 1.25rem; background: var(--surface); border: 1px solid var(--input-border); border-radius: .7rem; box-shadow: 0 .5rem 2rem #0002; z-index: 2; }
@@ -379,6 +392,8 @@
 <button type="button" data-tab="settings" aria-controls="settings"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg><span><span data-i18n="Configuración">Configuración</span></span></button>
 <button type="button" data-tab="tests" aria-controls="tests"><svg class="icon" aria-hidden="true"><use href="#icon-test"/></svg><span><span data-i18n="Pruebas y modelos">Pruebas y modelos</span></span></button>
 <button type="button" data-tab="server" aria-controls="server"><svg class="icon" aria-hidden="true"><use href="#icon-server"/></svg><span><span data-i18n="Servidor y puertos">Servidor y puertos</span></span></button>
+<p class="nav-group admin-group"><span data-i18n="PROYECTO">PROYECTO</span></p>
+<button type="button" data-tab="about" aria-controls="about"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg><span data-i18n="Acerca de">Acerca de</span></button>
 </nav>
             <div class="sidebar-bottom">
               <label class="theme-control" for="language-panel"><span data-i18n="Idioma del panel">Idioma del panel</span><select id="language-panel" data-language-picker></select></label><label class="theme-control" for="theme-panel"><span data-i18n="Apariencia">Apariencia</span><select id="theme-panel" data-theme-picker><option value="system" data-i18n="Sistema">Sistema</option><option value="dark" data-i18n="Oscuro">Oscuro</option><option value="light" data-i18n="Claro">Claro</option></select></label>
@@ -601,6 +616,30 @@
             ><small><span data-i18n="Guarda buzones, reglas y notificaciones antes de hacer una prueba.">Guarda buzones, reglas y notificaciones antes de hacer una prueba.</span></small>
           </div>
         </form>
+        <section id="about" class="hidden" aria-labelledby="page-title">
+          <div class="about-grid">
+            <div class="card">
+              <h2>PiVigia</h2>
+              <p data-i18n="Detección local para tus cámaras. Recibe imágenes, analiza personas, coches y animales, y envía los avisos que necesitas.">Detección local para tus cámaras. Recibe imágenes, analiza personas, coches y animales, y envía los avisos que necesitas.</p>
+              <!-- Datos públicos del proyecto: editar aquí, sin usar contactos ni secretos de la instalación. -->
+              <dl class="about-details">
+                <div><dt data-i18n="Desarrollador">Desarrollador</dt><dd>Gente del Condado</dd></div>
+                <div><dt data-i18n="Correo">Correo</dt><dd><a href="mailto:pivigia@gentedelcondado.es">pivigia@gentedelcondado.es</a></dd></div>
+                <div><dt data-i18n="Versión">Versión</dt><dd>__PIVIGIA_VERSION__</dd></div>
+              </dl>
+            </div>
+            <div class="card">
+              <h2 data-i18n="Apoya PiVigia">Apoya PiVigia</h2>
+              <p data-i18n="Tu donativo ayuda a mantener el proyecto y seguir mejorándolo.">Tu donativo ayuda a mantener el proyecto y seguir mejorándolo.</p>
+              <!-- El enlace sale del iframe de Ingress sin cargar scripts externos ni cambiar la CSP. -->
+              <a class="support-link" href="https://ko-fi.com/gentedelcondado" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-describedby="kofi-link-note">
+                <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 8h12v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8ZM16 8h2a3 3 0 0 1 0 6h-2M3 22h16M7 2v3M12 2v3"/></svg>
+                <span data-i18n="Apóyame en Ko-fi">Apóyame en Ko-fi</span>
+              </a>
+              <p id="kofi-link-note" class="hint" data-i18n="Se abre en una pestaña nueva.">Se abre en una pestaña nueva.</p>
+            </div>
+          </div>
+        </section>
         <footer><span>PiVigia <span id="service-version">__PIVIGIA_VERSION__</span></span><span><span data-i18n="DETECCIÓN LOCAL · UN ANÁLISIS A LA VEZ">DETECCIÓN LOCAL · UN ANÁLISIS A LA VEZ</span></span></footer>
         </div>
       </div>
@@ -709,6 +748,7 @@
         settings: [t("04 / ADMINISTRACIÓN"), t("Configuración"), t("Ajusta el análisis y los canales de notificación.")],
         tests: [t("05 / ADMINISTRACIÓN"), t("Pruebas y modelos"), t("Comprueba tus imágenes y elige el detector adecuado.")],
         server: [t("06 / ADMINISTRACIÓN"), t("Servidor y puertos"), t("Consulta las conexiones y los ajustes de tu instalación.")],
+        about: [t("07 / PROYECTO"), t("Acerca de"), t("Conoce el proyecto y apoya su desarrollo.")],
       };
       function icon(name) {
         const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1180,7 +1220,7 @@
       document.querySelectorAll("[data-tab]").forEach(
         (button) =>
           (button.onclick = () => {
-            if (!identity || (!identity.can_admin && !["overview", "cameras"].includes(button.dataset.tab))) return;
+            if (!identity || (!identity.can_admin && !["overview", "cameras", "about"].includes(button.dataset.tab))) return;
             document
               .querySelectorAll("[data-tab]")
               .forEach((b) => {
@@ -1194,7 +1234,7 @@
             $("page-description").textContent = description;
             document.title = title + " · PiVigia";
             setMenu(false);
-            for (const id of ["overview", "mailboxes", "settings", "cameras", "tests", "server"])
+            for (const id of Object.keys(sections))
               $(id).classList.toggle("hidden", button.dataset.tab !== id);
             $("save-bar").classList.toggle(
               "hidden",

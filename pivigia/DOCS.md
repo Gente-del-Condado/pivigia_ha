@@ -19,6 +19,31 @@ Si ya instalaste PiVigia desde Forgejo, otro repositorio o una carpeta local, co
 
 Si ya tienes PiVigia instalado, conserva **la URL y la instancia existentes**. Añadir el mismo proyecto con otra URL puede crear otro identificador de repositorio; no traslada automáticamente los datos.
 
+## SMTP de salida con TLS
+
+Configura el correo de avisos dentro del portal, en **Configuración → SMTP de
+salida**, y guarda antes de probarlo. Para el puerto **465**, selecciona
+**TLS directo** (SSL con verificación); para **587**, normalmente **STARTTLS**, siempre según
+tu proveedor. El servidor configurado debe coincidir con un nombre incluido
+en su certificado, aunque otro alias DNS apunte al mismo equipo.
+
+Si la prueba indica que el certificado no corresponde al nombre, utiliza el
+nombre SMTP autorizado por tu proveedor o corrige su certificado. No necesitas
+rellenar `tls_cert` ni `tls_key`: esos campos pertenecen a la entrada de las cámaras.
+El [diagnóstico TLS](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia/src/branch/main/docs/PROBLEMAS.md#certificado-tls-del-correo-de-salida) explica
+las otras causas y sus mensajes. Desde 0.2.1, los fallos TLS de la prueba dejan
+un motivo en **Registro**, sin credenciales ni respuestas privadas del servidor.
+
+## Acerca de y donativos
+
+En el menú lateral del portal, **Acerca de** muestra la versión instalada, el
+desarrollador **Gente del Condado** y el contacto **pivigia@gentedelcondado.es**.
+Está disponible tanto para administradores como para usuarios de solo consulta.
+
+El botón **Apóyame en Ko-fi** abre [Gente del Condado en Ko-fi](https://ko-fi.com/gentedelcondado)
+en una pestaña nueva. El portal permanece abierto dentro de Home Assistant;
+el donativo se realiza en la página de Ko-fi y requiere conexión a Internet.
+
 ## Opciones del complemento
 
 | Opción | Obligatoria | Uso |

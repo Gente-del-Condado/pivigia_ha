@@ -1,5 +1,12 @@
 # Historial de versiones
 
+## 0.2.1 — Acerca de y diagnóstico TLS
+
+- Nueva sección «Acerca de» con desarrollador, contacto y versión, accesible también en modo de solo consulta.
+- Botón «Apóyame en Ko-fi» que abre la página de Gente del Condado fuera del panel integrado de Home Assistant, sin widgets ni dependencias externas.
+- Textos en español e inglés y presentación adaptada a móvil y a los temas claro y oscuro.
+- Diagnóstico TLS de salida específico para nombre incorrecto, certificado caducado o aún no válido, autofirmado y cadena no verificable. Las pruebas dejan un motivo seguro en el registro y los avisos automáticos lo muestran en el historial; se mantiene la verificación del certificado y del nombre.
+
 ## 0.2.0 — Mantenimiento y comprobación de distribución
 
 - Nueva entrega para comprobar el recorrido automático desde Forgejo hasta las imágenes GHCR y las distribuciones de Home Assistant.

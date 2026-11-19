@@ -2,6 +2,7 @@
 
 
 import base64
+import logging
 import smtplib
 import ssl
 import time
@@ -12,8 +13,10 @@ from pydantic import BaseModel, Field, field_validator
 
 from .config import Mailbox, email_address
 from .notifications import prepare_images
-from .worker import Worker
-from .i18n import tr
+from .worker import Worker, tls_error_description
+from .i18n import service_language, tr, use_language
+
+log = logging.getLogger(__name__)
 
 
 class TestEmail(BaseModel):
@@ -48,8 +51,12 @@ def send_test_email(settings, test):
         Worker.send_email(settings, test.destination, message)
     except smtplib.SMTPAuthenticationError:
         raise ValueError(tr("El servidor rechazó las credenciales. Revisa usuario y contraseña SMTP.")) from None
-    except ssl.SSLError:
-        raise ValueError(tr("No se pudo verificar la conexión TLS. Revisa el servidor, puerto y seguridad.")) from None
+    except ssl.SSLError as error:
+        # El registro usa el idioma del servicio; el panel conserva el de la petición.
+        # No registrar la excepción nativa, destinatarios ni credenciales SMTP.
+        with use_language(service_language(settings.language)):
+            log.warning(tr("Prueba de correo fallida: %s"), tls_error_description(error))
+        raise ValueError(tls_error_description(error)) from None
     except smtplib.SMTPRecipientsRefused:
         raise ValueError(tr("El servidor rechazó el destinatario de prueba.")) from None
     except Exception:
