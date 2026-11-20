@@ -11,13 +11,51 @@ Necesitas Home Assistant con Supervisor, arquitectura AMD64 o ARM64 y conexión 
 3. Busca **PiVigia** e instala. Supervisor descarga la imagen ya compilada; no construye PiVigia en tu equipo.
 4. En **Configuración**, introduce un `admin_token` propio de al menos 16 caracteres. Guarda.
 5. Inicia el complemento, revisa **Registro** y abre **Interfaz web**.
+6. Sigue los primeros pasos de esta página para crear un buzón y enviar una prueba.
 
 Mis_app_ha recibe automáticamente la carpeta del complemento cuando se actualiza el proyecto. Home Assistant ofrece una actualización cuando aumenta la versión de su manifiesto; la sincronización de la tienda no instala esa actualización por sí sola.
 
 Si ya instalaste PiVigia desde Forgejo, otro repositorio o una carpeta local, conserva la URL y la instancia existentes. La identidad del complemento incluye el repositorio: añadir Mis_app_ha no migra datos ni convierte aquella instancia en esta. Haz copia y planifica una migración antes de cambiar de origen; no inicies dos instancias con los mismos puertos.
-6. Sigue los primeros pasos de esta página para crear un buzón y enviar una prueba.
 
-Si ya tienes PiVigia instalado, conserva **la URL y la instancia existentes**. Añadir el mismo proyecto con otra URL puede crear otro identificador de repositorio; no traslada automáticamente los datos.
+## Elegir recepción y salida
+
+| Necesidad | Qué configurar en el portal |
+| --- | --- |
+| La cámara envía a PiVigia | Buzón de recepción directa y puerto SMTP accesible desde la cámara. |
+| Descargar fotos de Gmail, Hotmail o tu servidor | Cuenta externa IMAP; no hace falta publicar puertos de entrada. |
+| Recibir y enviar desde la misma cuenta externa | Activar recepción en Buzones, habilitar envío en Configuración y seleccionarla para las alertas. |
+| Cuenta externa solo para enviar | Mantener Buzón activo desmarcado; habilitar su envío y seleccionarla. |
+| Recibir en una cuenta y enviar con otra | Activar IMAP en la primera; seleccionar la segunda como cuenta de alertas. |
+
+La cuenta de alertas es global; cada buzón mantiene sus reglas y destinatarios. Desactivar recepción no desactiva envío. Usa como destino una dirección diferente de la cuenta consultada para evitar reenvíos circulares.
+
+## Cuenta externa paso a paso
+
+1. Abre **Buzones → + Cuenta externa**; elige proveedor y tu dirección/usuario reales. Deja `INBOX` y 60 segundos para empezar. Completa el acceso según la tabla siguiente.
+2. Define destinos, categorías y regla; guarda. La cuenta nace desactivada y puede permanecer así mientras se prepara.
+3. Si también enviará, habilítala en **Configuración → Correo de salida**, revisa el remitente autorizado, elígela como cuenta de alertas y guarda.
+4. Si usa OAuth2, conecta desde Buzones después de guardar el permiso de envío. Volver a habilitar o cambiar SMTP exige nueva autorización.
+5. Pulsa **Probar conexión** en Buzones. Solo comprueba IMAP y carpeta. Activa Buzón activo, guarda y espera **Seguimiento iniciado** antes de enviar una foto nueva.
+6. Usa **Prueba 1** para comprobar SMTP. Después verifica Actividad y el aviso de la foto: una prueba de salida no acredita recepción ni detección.
+
+| Proveedor | Recepción / salida fijadas | Acceso |
+| --- | --- | --- |
+| Gmail | `imap.gmail.com:993` TLS / `smtp.gmail.com:465` TLS | OAuth2 o contraseña de aplicación permitida por la cuenta. |
+| Outlook / Hotmail personal | `outlook.office365.com:993` TLS / `smtp-mail.outlook.com:587` STARTTLS | OAuth2 con código de dispositivo, sin secreto ni callback. |
+| Gente del Condado | `mail.gentedelcondado.es:993` TLS / `mail.gentedelcondado.es:465` TLS | Usuario y contraseña propios; remitente autorizado por esa cuenta. |
+| Otro servidor | IMAP con TLS directo; SMTP con TLS directo o STARTTLS | Datos y permisos facilitados por el administrador. |
+
+**Gmail con contraseña de aplicación:** activa verificación en dos pasos y genera una clave específica si tu cuenta lo permite. Selecciona Contraseña / contraseña de aplicación e introdúcela en PiVigia; no uses la contraseña habitual. No necesita URL pública ni abrir puertos. [Instrucciones de Google](https://support.google.com/accounts/answer/185833?hl=es).
+
+**Gmail con OAuth2:** registra un cliente de tipo Aplicación web en Google Cloud, configura consentimiento y permiso `https://mail.google.com/`, y registra el retorno HTTPS estable de PiVigia terminado en `/oauth/callback`. Copia ID/secreto/retorno en Configurar OAuth2, abre el panel en el mismo dominio y puerto HTTPS, guarda y pulsa Conectar con OAuth2. Autoriza la cuenta configurada y vuelve al panel original. Una ruta temporal de Ingress no es un callback estable. [Registro OAuth web de Google](https://developers.google.com/identity/protocols/oauth2/web-server).
+
+**Hotmail/Outlook:** permite IMAP en Outlook web. Registra una aplicación Microsoft que incluya cuentas personales, habilita flujos de cliente público y añade permisos delegados de Office 365 Exchange Online `IMAP.AccessAsUser.All` y, si enviarás, `SMTP.Send`. Pega el ID de cliente, guarda y conecta desde PiVigia. Abre el enlace de Microsoft mostrado en tu panel, introduce su código y vuelve a la pestaña original. Funciona desde Ingress sin callback. El perfil no preconfigura organizaciones Microsoft 365. [Ajustes de Outlook.com](https://support.microsoft.com/en-us/outlook/pop-imap-and-smtp-settings-for-outlook-com) y [permisos OAuth de Microsoft](https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth).
+
+**Servidor propio:** crear la regla no crea un usuario del proveedor. OAuth2 solo funciona si el administrador configura realmente XOAUTH2, PKCE y renovación; elegirlo en PiVigia no modifica YunoHost. Las cuentas externas exigen TLS verificado y direcciones IP públicas, incluso con DNS interno. Un relé SMTP privado se configura como SMTP manual.
+
+La primera consulta omite el historial previo. PiVigia importa mensajes nuevos, leídos o no, sin borrarlos, moverlos ni marcarlos como leídos. Al pausar conserva el cursor y al reanudar recoge lo pendiente. Empezar desde ahora omite pendientes con confirmación; no borra correos del proveedor. Conserva `mail-secrets.key` y SQLite juntos en las copias.
+
+Esta página contiene los pasos esenciales para Supervisor. El [manual ampliado con capturas](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia/src/branch/main/docs/CORREO.md) y las guías de desarrollo pertenecen al origen privado y necesitan acceso autorizado mientras no se publique la web estática.
 
 ## SMTP de salida con TLS
 
@@ -41,7 +79,7 @@ ni duplicar secretos. La recepción externa puede quedar desactivada si la cuent
 se utiliza solo para enviar. Todo se gestiona en el portal del complemento y
 utiliza el mismo almacenamiento persistente; no necesita abrir puertos adicionales.
 
-Configura el correo de avisos dentro del portal, en **Configuración → SMTP de
+Configura el correo de avisos dentro del portal, en **Configuración → Correo de
 salida**, y guarda antes de probarlo. Para el puerto **465**, selecciona
 **TLS directo** (SSL con verificación); para **587**, normalmente **STARTTLS**, siempre según
 tu proveedor. El servidor configurado debe coincidir con un nombre incluido
@@ -198,7 +236,7 @@ comprueba la versión que muestra el panel de PiVigia. La integración de sensor
 se distribuye aparte: actualizarla no actualiza el servidor ni sustituye el
 complemento. Consulta [Publicación](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia/src/branch/main/docs/PUBLICACION.md) para seguir cada destino.
 
-Los datos del complemento están en `/data`, incluidos SQLite, token y modelos opcionales en `/data/models`. El código público y las capturas del manual no incluyen esos datos.
+Los datos del complemento están en `/data`, incluidos SQLite, token, clave `mail-secrets.key` de las cuentas externas y modelos opcionales en `/data/models`. El código público y las capturas del manual no incluyen esos datos.
 
 Para instalar desde una carpeta local de desarrollo, conserva su identidad y sustituye las fuentes del mismo complemento antes de reconstruirlo. Un cambio de repositorio o de identificador requiere una migración planificada con copia y restauración.
 

@@ -1,5 +1,13 @@
 # Historial de versiones
 
+## 0.3.2 — 2026-11-20
+
+- Manual revisado para recepción local/IMAP, envío por cuentas externas y OAuth2, con guía por situaciones y capturas actuales de datos ficticios. Guía de correo en inglés ampliada.
+- Documentación incluida en Home Assistant con configuración esencial de Gmail, Hotmail y servidor propio sin depender de acceso al repositorio privado.
+- Arquitectura, API de pruebas, firmas de identidad, copias, privacidad y relevo a desarrolladores actualizados; fuentes y estructura de instalación conservadas.
+- Demostración de solo lectura con perfiles externos; capturas declaradas y verificadas. Web validable en raíz o subruta, con idioma del artículo inglés para lectores de pantalla.
+- Estado de Pages corregido: la web está preparada, pero el espejo privado sigue limitado por el plan y con Actions desactivado. La plantilla de Pages solo admite ejecución manual en un destino público autorizado.
+
 ## 0.3.1 — 2026-11-20
 
 - Configuración permite elegir la cuenta que envía todas las alertas: SMTP manual o cuentas externas de Gmail, Outlook/Hotmail, Gente del Condado y proveedores personalizados, con habilitación explícita del envío y remitente autorizado.

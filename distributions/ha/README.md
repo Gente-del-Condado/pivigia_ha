@@ -65,7 +65,7 @@ El ejemplo sigue los [disparadores de estado de Home Assistant](https://www.home
 El desarrollo completo se mantiene primero en el principal privado de
 [Forgejo](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia), después en su
 [espejo privado de GitHub](https://github.com/Gente-del-Condado/pivigia). Tras CI,
-Actions publica aquí solo la integración y sus metadatos, además de copiarla al
+el publicador de pivigia_ha actualiza su propia integración y exportación. El consumidor independiente sincroniza el
 [catálogo de componentes](https://github.com/Gente-del-Condado/Mis_componente_ha).
 El servidor se distribuye en
 [Mis_app_ha](https://github.com/Gente-del-Condado/Mis_app_ha). No hay publicadores
