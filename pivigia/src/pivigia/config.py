@@ -148,6 +148,7 @@ class Settings(BaseModel):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    smtp_account: str = Field(default="", max_length=254)
     telegram_enabled: bool = False
     telegram_bot_token: str = Field(default="", max_length=160)
 
@@ -175,6 +176,11 @@ class Settings(BaseModel):
             self.smtp_from = email_address(self.smtp_from)
         if len({b.address for b in self.mailboxes}) != len(self.mailboxes):
             raise ValueError(tr("Hay buzones duplicados"))
+        if self.smtp_account:
+            self.smtp_account = email_address(self.smtp_account)
+            if not any(b.address == self.smtp_account and b.source == "imap" and b.external.smtp_enabled
+                       for b in self.mailboxes):
+                raise ValueError(tr("La cuenta elegida para las alertas no existe o no tiene habilitado el envío."))
         if sum(b.source == "imap" for b in self.mailboxes) > 10:
             raise ValueError(tr("Se permiten hasta 10 cuentas externas."))
         if len({camera.id for camera in self.cameras}) != len(self.cameras):

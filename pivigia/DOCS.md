@@ -21,6 +21,26 @@ Si ya tienes PiVigia instalado, conserva **la URL y la instancia existentes**. A
 
 ## SMTP de salida con TLS
 
+Desde **0.3.1**, en **Configuración → Correo de salida · quién enviará las alertas**
+puedes elegir **SMTP manual / relé propio** o una cuenta externa creada en Buzones.
+Habilita explícitamente su permiso para enviar, revisa el remitente y guarda.
+Gmail, Outlook/Hotmail y Gente del Condado completan sus servidores seguros.
+Si usa OAuth2, vuelve a conectar la cuenta tras habilitar el envío; Microsoft
+necesita también el permiso delegado `SMTP.Send`. Gente del Condado mantiene
+contraseña hasta que su servidor ofrezca OAuth2; esta opción no modifica YunoHost.
+
+**Pruebas y modelos → Prueba 1** permite elegir la cuenta para esa única prueba
+y muestra el remitente y servidor. No cambia la cuenta de las alertas ni comprueba
+la recepción. Guarda antes de probar. Un rechazo de remitente, destinatario,
+credenciales, OAuth2 o TLS tiene su propio diagnóstico. Si se pierde la conexión,
+comprueba el destino antes de repetir: el mensaje podría haberse aceptado.
+Consulta [Correo y Telegram](https://gentedelcondado.es/forgejo/wolfbelmi88/pivigia/src/branch/main/docs/NOTIFICACIONES.md) para el procedimiento completo.
+
+Los ajustes SMTP existentes siguen funcionando tras actualizar, sin migrar buzones
+ni duplicar secretos. La recepción externa puede quedar desactivada si la cuenta
+se utiliza solo para enviar. Todo se gestiona en el portal del complemento y
+utiliza el mismo almacenamiento persistente; no necesita abrir puertos adicionales.
+
 Configura el correo de avisos dentro del portal, en **Configuración → SMTP de
 salida**, y guarda antes de probarlo. Para el puerto **465**, selecciona
 **TLS directo** (SSL con verificación); para **587**, normalmente **STARTTLS**, siempre según
@@ -137,7 +157,7 @@ El acceso directo al puerto web no hereda una sesión de Home Assistant. Para ad
 ## Primer aviso
 
 1. En **Buzones y reglas**, crea `patio@pivigia.local` con contraseña propia, categoría **Personas**, confianza inicial 0,50 y un destino de correo.
-2. En **Configuración**, guarda el SMTP de salida de tu proveedor o prepara Telegram. Son credenciales distintas de las del buzón.
+2. En **Configuración**, elige SMTP manual o habilita una cuenta externa para enviar; también puedes preparar Telegram. La contraseña del buzón local pertenece únicamente a la recepción.
 3. En **Pruebas**, envía un correo manual para comprobar la salida.
 4. Prueba una foto seleccionando el buzón. **Analizar imagen sin enviar avisos** muestra la decisión sin notificar.
 5. Configura la cámara con la IP de Home Assistant, el puerto SMTP publicado, el buzón como usuario y destinatario, y su contraseña.

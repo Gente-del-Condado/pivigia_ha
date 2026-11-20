@@ -197,7 +197,7 @@ class MailOAuth:
             )
         return {
             "status": "connected",
-            "detail": tr("Cuenta autorizada. Prueba la conexión IMAP para verificar usuario y carpeta."),
+            "detail": tr("Cuenta autorizada. Prueba IMAP para comprobar la recepción y, si habilitas el envío, usa la prueba de correo SMTP."),
         }
 
     def finish_device(self, state, flow, address, account):
@@ -234,13 +234,13 @@ class MailOAuth:
             )
         return {
             "status": "connected",
-            "detail": tr("Cuenta autorizada. Prueba la conexión IMAP para verificar usuario y carpeta."),
+            "detail": tr("Cuenta autorizada. Prueba IMAP para comprobar la recepción y, si habilitas el envío, usa la prueba de correo SMTP."),
         }
 
     def access_token(self, address, account):
         tokens = self.store.mail_tokens(address, account.oauth_key())
         if not tokens:
-            raise MailAccountError(tr("Conecta la cuenta con OAuth2 antes de consultar el buzón."))
+            raise MailAccountError(tr("Conecta la cuenta con OAuth2 antes de consultar o enviar correo."))
         if tokens["expires_at"] > time.time() + 60:
             return tokens["access_token"]
         fields = {

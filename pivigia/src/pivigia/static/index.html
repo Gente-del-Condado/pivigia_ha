@@ -465,12 +465,14 @@
             <h2><span data-i18n="Prueba 1 · Enviar un correo">Prueba 1 · Enviar un correo</span></h2>
             <p><span data-i18n="Comprueba el correo">Comprueba el correo</span> <strong><span data-i18n="de salida">de salida</span></strong> <span data-i18n="usando la configuración que ya has guardado. Se enviará un correo real únicamente al destinatario que escribas aquí. No necesitas una cámara ni una detección.">usando la configuración que ya has guardado. Se enviará un correo real únicamente al destinatario que escribas aquí. No necesitas una cámara ni una detección.</span></p>
             <form id="email-test-form">
+              <label><span data-i18n="Cuenta que enviará la prueba">Cuenta que enviará la prueba</span><select id="test-smtp-account"></select></label>
+              <p id="test-smtp-summary" class="hint" role="status" aria-live="polite"></p>
               <div class="grid">
                 <label><span data-i18n="Enviar la prueba a">Enviar la prueba a</span><input id="test-destination" type="email" required autocomplete="email" placeholder="tu-correo@ejemplo.es"  data-i18n-placeholder="tu-correo@ejemplo.es"/></label>
                 <label><span data-i18n="Asunto">Asunto</span><input id="test-subject" maxlength="160" required value="Prueba de PiVigia"  data-i18n-value="Prueba de PiVigia"/></label>
               </div>
               <label><span data-i18n="Mensaje">Mensaje</span><textarea id="test-text" rows="3" maxlength="5000" required data-i18n="Este es un correo de prueba enviado desde el panel de PiVigia.">Este es un correo de prueba enviado desde el panel de PiVigia.</textarea></label>
-              <p class="hint"><span data-i18n="Guarda primero los ajustes de correo en Configuración. La aceptación por el servidor SMTP no garantiza que el correo llegue a la bandeja de entrada; revisa también spam. Esta prueba no comprueba la recepción SMTP desde la cámara.">Guarda primero los ajustes de correo en Configuración. La aceptación por el servidor SMTP no garantiza que el correo llegue a la bandeja de entrada; revisa también spam. Esta prueba no comprueba la recepción SMTP desde la cámara.</span></p>
+              <p class="hint"><span data-i18n="Guarda primero la configuración. Elegir una cuenta aquí no cambia la cuenta de las alertas. Esta prueba solo comprueba el envío SMTP, no la lectura IMAP ni la recepción desde cámaras. La aceptación no garantiza la llegada a la bandeja de entrada: revisa también spam.">Guarda primero la configuración. Elegir una cuenta aquí no cambia la cuenta de las alertas. Esta prueba solo comprueba el envío SMTP, no la lectura IMAP ni la recepción desde cámaras. La aceptación no garantiza la llegada a la bandeja de entrada: revisa también spam.</span></p>
               <button class="primary" id="test-send-email"><span data-i18n="Enviar correo de prueba">Enviar correo de prueba</span></button>
               <div id="email-test-result" class="result hidden" role="status" aria-live="polite"></div>
             </form>
@@ -576,11 +578,19 @@
             </div>
             <div class="card">
               <h2><span data-i18n="Correo de salida · quién enviará las alertas">Correo de salida · quién enviará las alertas</span></h2>
-              <p><span data-i18n="Estos son los datos de tu proveedor de correo o relé SMTP. No pongas aquí la IP de PiVigia salvo que tengas un relé de salida en ese equipo.">Estos son los datos de tu proveedor de correo o relé SMTP. No pongas aquí la IP de PiVigia salvo que tengas un relé de salida en ese equipo.</span></p>
-              <div class="grid" id="smtp-fields"></div>
+              <p><span data-i18n="Elige una cuenta para enviar todas las alertas por correo, tanto de buzones locales como externos y cámaras. Recibir por IMAP y enviar por SMTP son permisos distintos.">Elige una cuenta para enviar todas las alertas por correo, tanto de buzones locales como externos y cámaras. Recibir por IMAP y enviar por SMTP son permisos distintos.</span></p>
+              <label><span data-i18n="Cuenta para las alertas">Cuenta para las alertas</span><select id="smtp-account"></select></label>
+              <p id="smtp-account-summary" class="hint" role="status" aria-live="polite"></p>
+              <div id="smtp-manual">
+                <h3><span data-i18n="SMTP manual / relé propio">SMTP manual / relé propio</span></h3>
+                <p class="hint"><span data-i18n="Estos son los datos de tu proveedor de correo o relé SMTP. No pongas aquí la IP de PiVigia salvo que tengas un relé de salida en ese equipo.">Estos son los datos de tu proveedor de correo o relé SMTP. No pongas aquí la IP de PiVigia salvo que tengas un relé de salida en ese equipo.</span></p>
+                <div class="grid" id="smtp-fields"></div>
+              </div>
+              <h3><span data-i18n="Cuentas externas disponibles para enviar">Cuentas externas disponibles para enviar</span></h3>
+              <div id="outgoing-accounts"></div>
               <p class="hint"><span data-i18n="Después de guardar, abre Pruebas para enviar un correo al destinatario que elijas.">Después de guardar, abre Pruebas para enviar un correo al destinatario que elijas.</span></p>
               <p class="hint">
-                <span data-i18n="Para Gmail utiliza el servidor y las credenciales permitidas por tu cuenta (por ejemplo, una contraseña de aplicación). El remitente debe estar autorizado en ese servidor. El aviso muestra las imágenes marcadas y los porcentajes; el correo original se adjunta completo.">Para Gmail utiliza el servidor y las credenciales permitidas por tu cuenta (por ejemplo, una contraseña de aplicación). El remitente debe estar autorizado en ese servidor. El aviso muestra las imágenes marcadas y los porcentajes; el correo original se adjunta completo.</span>
+                <span data-i18n="El remitente debe ser la cuenta autenticada o un alias autorizado. Los destinatarios de las alertas se indican en cada buzón. No uses como destino de las alertas el mismo buzón que PiVigia consulta.">El remitente debe ser la cuenta autenticada o un alias autorizado. Los destinatarios de las alertas se indican en cada buzón. No uses como destino de las alertas el mismo buzón que PiVigia consulta.</span>
               </p>
             </div>
             <div class="card">
@@ -672,7 +682,8 @@
         }
       }
       let configurationDirty = false;
-      document.querySelectorAll("#configuration, #server-form, #email-test-form").forEach(form => form.addEventListener("input", () => { configurationDirty = true; }));
+      document.querySelectorAll("#configuration, #server-form").forEach(form => form.addEventListener("input", () => { configurationDirty = true; }));
+      let savedConfig = null;
       document.querySelectorAll("#add-box, #add-external, #add-camera").forEach(button => button.addEventListener("click", () => { configurationDirty = true; }));
       document.getElementById("language-locked").classList.toggle("hidden", !i18nData.language_locked);
       for (const picker of document.querySelectorAll("[data-language-picker], #service-language")) {
@@ -957,6 +968,7 @@
           card.append(node("p", t("Para silenciar coches, marca solo Coches y elige «Solo si no aparece ninguna categoría marcada». Un coche en cualquier foto silencia el correo entero. Si se omite alguna foto, no se envía aviso por ausencia."), "hint"));
           parent.append(card);
         });
+        renderOutgoing();
       }
       // Los secretos OAuth solo viven en el servidor; el panel conserva pruebas efímeras en memoria.
       const mailFlows = new Map();
@@ -984,6 +996,7 @@
           const a = config.mailboxes[index].external;
           Object.assign(a, {host: {gmail: "imap.gmail.com", outlook: "outlook.office365.com", gentedelcondado: "mail.gentedelcondado.es"}[a.provider] || "",
             port: 993, password: "", client_id: "", client_secret: "", authorization_endpoint: "", token_endpoint: "", scope: "",
+            smtp_enabled: false, smtp_host: "", smtp_from: "",
             auth: ["gmail", "outlook"].includes(a.provider) ? "oauth2" : "password"});
           renderBoxes();
         };
@@ -1116,6 +1129,78 @@
             invert_detection: val("rule") === "absent",
           };
         });
+      }
+      // La salida reutiliza una identidad guardada. La prueba nunca modifica esta selección.
+      function outgoingSummary(settings, selected) {
+        if (!selected) return settings.smtp_host && settings.smtp_from
+          ? t("Remitente: {sender} · Servidor: {host}:{port} · Seguridad: {security}", {sender: settings.smtp_from,
+            host: settings.smtp_host, port: settings.smtp_port, security: settings.smtp_security === "plain" ? t("Sin cifrado") : settings.smtp_security === "ssl" ? "TLS" : "STARTTLS"})
+          : t("SMTP manual pendiente: guarda el servidor y el remitente en Configuración.");
+        const a = settings.mailboxes.find(b => b.address === selected && b.source === "imap")?.external;
+        if (!a?.smtp_enabled) return t("La cuenta seleccionada ya no está disponible para enviar. Elige otra y guarda la configuración.");
+        return t("Remitente: {sender} · Servidor: {host}:{port} · Seguridad: {security}", {
+          sender: a.smtp_from || a.username, host: a.smtp_host, port: a.smtp_port,
+          security: (a.smtp_security === "starttls" ? "STARTTLS" : "TLS") + " · " + (a.auth === "oauth2" ? "OAuth2" : t("Contraseña / contraseña de aplicación"))});
+      }
+      function renderOutgoing() {
+        const parent = $("outgoing-accounts"), select = $("smtp-account");
+        parent.replaceChildren(); select.replaceChildren(new Option(t("SMTP manual / relé propio"), ""));
+        let count = 0;
+        config.mailboxes.forEach((box, index) => {
+          if (box.source !== "imap") return;
+          count++;
+          const a = box.external, card = node("div", undefined, "box");
+          const presets = {gmail: ["smtp.gmail.com", 465, "ssl"], outlook: ["smtp-mail.outlook.com", 587, "starttls"],
+            gentedelcondado: ["mail.gentedelcondado.es", 465, "ssl"]};
+          if (presets[a.provider]) [a.smtp_host, a.smtp_port, a.smtp_security] = presets[a.provider];
+          card.append(node("h4", box.address || t("Cuenta externa")));
+          const enabledLabel = node("label"), enabled = node("input");
+          enabled.type = "checkbox"; enabled.checked = Boolean(a.smtp_enabled);
+          enabledLabel.append(enabled, document.createTextNode(t("Permitir que esta cuenta envíe correo")));
+          card.append(enabledLabel);
+          enabled.onchange = () => {
+            config.mailboxes[index].external.smtp_enabled = enabled.checked;
+            configurationDirty = true; renderOutgoing();
+          };
+          if (a.smtp_enabled) {
+            if (box.address) select.add(new Option(box.address, box.address));
+            const grid = node("div", undefined, "grid");
+            for (const [key, title, type] of [["smtp_from", t("Remitente autorizado"), "email"],
+              ["smtp_host", t("Servidor SMTP de salida"), "text"], ["smtp_port", t("Puerto SMTP"), "number"]]) {
+              const input = field(grid, "outgoing_" + index + "_" + key, title, a[key] || (key === "smtp_from" ? a.username : ""), type);
+              if (key === "smtp_from") a.smtp_from = input.value;
+              input.required = true;
+              if (type === "number") input.max = "65535";
+              if (key !== "smtp_from") input.readOnly = a.provider !== "custom";
+              input.oninput = () => {
+                config.mailboxes[index].external[key] = type === "number" ? Number(input.value) : input.value;
+                $("smtp-account-summary").textContent = outgoingSummary(config, config.smtp_account);
+              };
+            }
+            const security = choice(grid, "smtp_security", t("Seguridad SMTP"), a.smtp_security || "ssl",
+              [["ssl", t("SSL/TLS directo")], ["starttls", "STARTTLS"]]);
+            security.disabled = a.provider !== "custom";
+            security.onchange = () => { config.mailboxes[index].external.smtp_security = security.value; };
+            card.append(grid);
+            card.append(node("p", a.auth === "oauth2"
+              ? t("Al habilitar el envío o cambiar su servidor, guarda y vuelve a conectar OAuth2 en Buzones. Outlook / Hotmail necesita también el permiso SMTP.Send. Probar IMAP no comprueba los permisos de envío.")
+              : t("Se usarán el usuario y la contraseña de esta cuenta guardados en Buzones. En un servidor personalizado, introduce de nuevo la contraseña al habilitar o cambiar el destino SMTP."), "hint"));
+            card.append(node("p", t("La recepción puede estar desactivada y el envío seguir habilitado. TLS y el certificado del servidor siempre se verifican."), "hint"));
+          }
+          parent.append(card);
+        });
+        if (!count) parent.append(node("p", t("Añade primero una cuenta externa en Buzones para usar Gmail, Outlook / Hotmail, Gente del Condado u otro proveedor."), "hint"));
+        const edit = node("button", t("Gestionar cuentas en Buzones")); edit.type = "button";
+        edit.onclick = () => document.querySelector('[data-tab="mailboxes"]').click(); parent.append(edit);
+        if (config.smtp_account && ![...select.options].some(o => o.value === config.smtp_account))
+          select.add(new Option(t("Cuenta no disponible") + " · " + config.smtp_account, config.smtp_account));
+        select.value = config.smtp_account || "";
+        const update = () => {
+          $("smtp-manual").classList.toggle("hidden", Boolean(select.value));
+          $("smtp-account-summary").textContent = outgoingSummary(config, select.value);
+        };
+        select.onchange = () => { config.smtp_account = select.value; configurationDirty = true; update(); };
+        update();
       }
       function renderSettings() {
         $("service-language").value = config.language;
@@ -1305,6 +1390,7 @@
           $("logout").textContent = session.provider === "homeassistant" ? t("Salir del panel") : t("Cerrar sesión");
           if (admin) {
             config = await api("settings");
+            savedConfig = structuredClone(config);
             renderTestOptions();
             $("analysis-fields").replaceChildren(); $("smtp-fields").replaceChildren();
             renderSettings();
@@ -1379,6 +1465,7 @@
               !identity?.can_admin || !["mailboxes", "settings", "cameras"].includes(button.dataset.tab),
             );
             if (button.dataset.tab === "server") loadServer();
+            if (button.dataset.tab === "settings" && identity?.can_admin) { readBoxes(); renderOutgoing(); }
             clearInterval(modelTimer);
             if (button.dataset.tab === "tests" && identity?.can_admin) {
               loadModels();
@@ -1449,6 +1536,7 @@
             body: JSON.stringify(config),
           });
           config = await api("settings");
+          savedConfig = structuredClone(config);
           renderTestOptions();
           $("telegram-token").value = config.telegram_bot_token;
           renderBoxes();
@@ -1613,24 +1701,45 @@
         const all = node("option", t("Sin buzón · todas las categorías, confianza 50%"));
         all.value = ""; select.append(all);
         for (const box of config.mailboxes) {
-          const option = node("option", box.address + (box.enabled ? "" : " · desactivado"));
+          const option = node("option", box.address + (box.enabled ? "" : " · " + t("desactivado")));
           option.value = box.address; select.append(option);
         }
         if ([...select.options].some(option => option.value === selected)) select.value = selected;
         $("image-test-help").textContent = t("Se usan los ajustes guardados: entre {min_width} × {min_height} y {max_width} × {max_height} píxeles; máximo {size} MB. Selecciona un buzón para comprobar sus categorías, confianza y destinos.", {min_width: config.min_width, min_height: config.min_height, max_width: config.max_width, max_height: config.max_height, size: (config.max_image_bytes / 1000000).toLocaleString(uiLocale)});
         $("setup-summary").textContent = t("Buzones activos guardados: ") + config.mailboxes.filter(box => box.enabled).length +
-          t(" · Correo de salida ") + (config.smtp_host && config.smtp_from ? t("configurado") : t("pendiente")) +
+          t(" · Correo de salida ") + (config.smtp_account || (config.smtp_host && config.smtp_from) ? t("configurado") : t("pendiente")) +
           t(" · Telegram ") + (config.telegram_enabled ? t("activado") : t("desactivado")) + ".";
+        const outgoing = $("test-smtp-account"), previous = outgoing.options.length ? outgoing.value : "__alerts__";
+        outgoing.replaceChildren(new Option(t("Usar la cuenta de las alertas"), "__alerts__"), new Option(t("SMTP manual / relé propio"), ""));
+        for (const box of savedConfig.mailboxes) {
+          if (box.source === "imap" && box.external.smtp_enabled) outgoing.add(new Option(box.address, box.address));
+        }
+        if ([...outgoing.options].some(o => o.value === previous)) outgoing.value = previous;
+        outgoing.onchange = () => {
+          const selected = outgoing.value === "__alerts__" ? savedConfig.smtp_account : outgoing.value;
+          $("test-smtp-summary").textContent = outgoingSummary(savedConfig, selected);
+          $("email-test-result").classList.add("hidden");
+        };
+        outgoing.onchange();
       }
       $("email-test-form").onsubmit = async event => {
         event.preventDefault();
+        if (configurationDirty) {
+          showResult("email-test-result", t("Hay cambios sin guardar. Guarda la configuración antes de enviar la prueba para usar los ajustes que estás viendo."), true);
+          return;
+        }
         $("test-send-email").disabled = true;
         showResult("email-test-result", t("Enviando el correo con los ajustes guardados… No cierres esta pestaña."));
         try {
           const result = await api("tests/email", {method: "POST", timeoutMs: 90000, body: JSON.stringify({
+            account: $("test-smtp-account").value === "__alerts__" ? savedConfig.smtp_account : $("test-smtp-account").value,
             destination: $("test-destination").value, subject: $("test-subject").value, text: $("test-text").value})});
-          showResult("email-test-result", result.detail);
-        } catch (error) { showResult("email-test-result", error.message, true); }
+          showResult("email-test-result", result.detail + "\n" + t("Aceptado por {host} con el remitente {sender}.", result.account));
+        } catch (error) {
+          showResult("email-test-result", error.name === "TimeoutError" || error.name === "AbortError"
+            ? t("El panel dejó de esperar la respuesta. El envío podría haberse completado; comprueba el destinatario antes de repetir la prueba.")
+            : error instanceof TypeError ? t("Se perdió la comunicación con el panel. El envío podría haberse completado; comprueba el destinatario antes de repetir la prueba.") : error.message, true);
+        }
         finally { $("test-send-email").disabled = false; }
       };
       $("image-test-form").onsubmit = async event => {

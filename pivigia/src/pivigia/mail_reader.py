@@ -103,7 +103,7 @@ def safe_error(error):
     if isinstance(error, MailAccountError):
         return str(error)
     if isinstance(error, ssl.SSLError):
-        return tls_error_description(error)
+        return tls_error_description(error, imap=True)
     if isinstance(error, imaplib.IMAP4.error):
         return tr("El servidor IMAP rechazó la operación. Revisa el usuario, la autorización y la carpeta.")
     return tr("No se pudo consultar la cuenta externa. Revisa el servidor, la conexión y sus permisos.")

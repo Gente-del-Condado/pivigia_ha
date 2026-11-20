@@ -3,8 +3,6 @@
 
 import base64
 import logging
-import smtplib
-import ssl
 import time
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
@@ -13,13 +11,16 @@ from pydantic import BaseModel, Field, field_validator
 
 from .config import Mailbox, email_address
 from .notifications import prepare_images
-from .worker import Worker, smtp_refusal_description, tls_error_description
+from .worker import smtp_error_description
+from .mail_network import MailAccountBusy
 from .i18n import service_language, tr, use_language
 
 log = logging.getLogger(__name__)
 
 
 class TestEmail(BaseModel):
+    model_config = {"extra": "forbid"}
+    account: str | None = Field(default=None, max_length=254)
     destination: str = Field(max_length=254)
     subject: str = Field(default_factory=lambda: tr("Prueba de PiVigia"), min_length=1, max_length=160)
     text: str = Field(default_factory=lambda: tr("Este es un correo de prueba enviado desde el panel de PiVigia."),
@@ -37,10 +38,14 @@ class TestEmail(BaseModel):
             raise ValueError(tr("El asunto no admite saltos de línea"))
         return value
 
+    @field_validator("account")
+    @classmethod
+    def account_valid(cls, value):
+        return email_address(value) if value else value
 
-def send_test_email(settings, test):
+
+def send_test_email(settings, test, sender):
     message = EmailMessage()
-    message["From"] = settings.smtp_from
     message["To"] = test.destination
     message["Subject"] = tr("[PiVigia · prueba] ") + test.subject
     message["Date"] = formatdate(localtime=False)
@@ -48,24 +53,19 @@ def send_test_email(settings, test):
     message["X-PiVigia"] = "1"
     message.set_content(test.text + tr("\n\nPrueba manual del correo de salida de PiVigia.\n"))
     try:
-        Worker.send_email(settings, test.destination, message)
-    except smtplib.SMTPAuthenticationError:
-        raise ValueError(tr("El servidor rechazó las credenciales. Revisa usuario y contraseña SMTP.")) from None
-    except ssl.SSLError as error:
-        # El registro usa el idioma del servicio; el panel conserva el de la petición.
-        # No registrar la excepción nativa, destinatarios ni credenciales SMTP.
+        identity = sender.identity(settings, test.account)
+        message["From"] = identity["sender"]
+        sender.send(settings, test.destination, message, test.account)
+    except MailAccountBusy:
+        raise
+    except Exception as error:
+        # Todos los fallos usan mensajes controlados. El registro sigue el idioma
+        # del servicio y la respuesta el del panel; nunca incluir secretos o respuestas SMTP.
         with use_language(service_language(settings.language)):
-            log.warning(tr("Prueba de correo fallida: %s"), tls_error_description(error))
-        raise ValueError(tls_error_description(error)) from None
-    except (smtplib.SMTPSenderRefused, smtplib.SMTPRecipientsRefused) as error:
-        with use_language(service_language(settings.language)):
-            log.warning(tr("Prueba de correo fallida: %s"), smtp_refusal_description(error, test=True))
-        raise ValueError(smtp_refusal_description(error, test=True)) from None
-    except Exception:
-        raise ValueError(
-            tr("No se pudo enviar. Revisa el servidor SMTP de salida, puerto, seguridad, remitente y conexión.")
-        ) from None
-    return {"ok": True, "detail": tr("El servidor SMTP ha aceptado el correo. Comprueba la bandeja y spam; esta confirmación no garantiza su llegada a la bandeja de entrada.")}
+            log.warning(tr("Prueba de correo fallida: %s"), smtp_error_description(error, test=True))
+        raise ValueError(smtp_error_description(error, test=True)) from None
+    return {"ok": True, "account": identity,
+            "detail": tr("El servidor SMTP ha aceptado el correo. Comprueba la bandeja y spam; esta confirmación no garantiza su llegada a la bandeja de entrada.")}
 
 
 def analyze_image(settings, detector, content, mailbox="", model=""):

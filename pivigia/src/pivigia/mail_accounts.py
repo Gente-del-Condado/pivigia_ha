@@ -15,17 +15,20 @@ from .i18n import tr
 PROVIDERS = {
     "gmail": {
         "host": "imap.gmail.com",
+        "smtp_host": "smtp.gmail.com", "smtp_port": 465, "smtp_security": "ssl",
         "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
         "token_endpoint": "https://oauth2.googleapis.com/token",
         "scope": "https://mail.google.com/",
     },
     "outlook": {
         "host": "outlook.office365.com",
+        "smtp_host": "smtp-mail.outlook.com", "smtp_port": 587, "smtp_security": "starttls",
         "authorization_endpoint": "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize",
         "token_endpoint": "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
         "scope": "https://outlook.office.com/IMAP.AccessAsUser.All offline_access",
     },
-    "gentedelcondado": {"host": "mail.gentedelcondado.es"},
+    "gentedelcondado": {"host": "mail.gentedelcondado.es", "smtp_host": "mail.gentedelcondado.es",
+                        "smtp_port": 465, "smtp_security": "ssl"},
     "custom": {},
 }
 
@@ -80,6 +83,11 @@ class ExternalMailbox(BaseModel):
     authorization_endpoint: str = Field(default="", max_length=2048)
     token_endpoint: str = Field(default="", max_length=2048)
     scope: str = Field(default="", max_length=1024)
+    smtp_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = Field(default=465, ge=1, le=65535)
+    smtp_security: Literal["ssl", "starttls"] = "ssl"
+    smtp_from: str = Field(default="", max_length=254)
 
     @field_validator("password", "client_secret")
     @classmethod
@@ -110,6 +118,19 @@ class ExternalMailbox(BaseModel):
             self.host = fixed["host"]
             self.port = 993
         self.host = hostname(self.host)
+        if fixed.get("smtp_host"):
+            for key in ("smtp_host", "smtp_port", "smtp_security"):
+                setattr(self, key, fixed[key])
+        if self.smtp_host:
+            self.smtp_host = hostname(self.smtp_host)
+        if self.smtp_enabled:
+            if not self.smtp_host:
+                raise ValueError(tr("Indica el servidor SMTP de la cuenta de salida."))
+            if not self.username.isascii():
+                raise ValueError(tr("El usuario de salida SMTP debe usar caracteres ASCII."))
+            # Importación local: config también define los buzones que usan este contrato.
+            from .config import email_address
+            self.smtp_from = email_address(self.smtp_from or self.username)
         if not self.username:
             raise ValueError(tr("Indica el usuario de la cuenta de correo."))
         if self.provider == "outlook" and self.auth != "oauth2":
@@ -121,6 +142,8 @@ class ExternalMailbox(BaseModel):
             if self.provider in {"gmail", "outlook"}:
                 for key in ("authorization_endpoint", "token_endpoint", "scope"):
                     setattr(self, key, fixed[key])
+                if self.provider == "outlook" and self.smtp_enabled:
+                    self.scope += " https://outlook.office.com/SMTP.Send"
             # Se permite guardar una cuenta aún sin registrar para completar el asistente.
             for key in ("authorization_endpoint", "token_endpoint", "redirect_uri"):
                 value = getattr(self, key)
@@ -139,7 +162,13 @@ class ExternalMailbox(BaseModel):
 
     def oauth_key(self):
         """Un cambio de identidad, destino o cliente obliga a autorizar de nuevo."""
-        data = self.model_dump(exclude={"folder", "interval", "password"})
+        # Mantener las autorizaciones 0.3.0 de recepción. Habilitar el envío añade
+        # explícitamente el destino SMTP a la vinculación y requiere otro consentimiento.
+        data = self.model_dump(exclude={"folder", "interval", "password", "smtp_enabled",
+                                        "smtp_host", "smtp_port", "smtp_security", "smtp_from"})
+        if self.smtp_enabled:
+            data.update(smtp_enabled=True, smtp_host=self.smtp_host, smtp_port=self.smtp_port,
+                        smtp_security=self.smtp_security)
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
     def oauth_ready(self):
@@ -157,7 +186,11 @@ def restore_secrets(account, previous, mask):
         ("client_secret", ("provider", "client_id", "authorization_endpoint", "token_endpoint")),
     ):
         if getattr(account, field) == mask:
-            if previous is None or any(getattr(account, k) != getattr(previous, k) for k in binding):
+            smtp_changed = (field == "password" and account.smtp_enabled and account.provider == "custom"
+                            and previous is not None and (not previous.smtp_enabled or any(
+                                getattr(account, k) != getattr(previous, k)
+                                for k in ("smtp_host", "smtp_port", "smtp_security"))))
+            if previous is None or smtp_changed or any(getattr(account, k) != getattr(previous, k) for k in binding):
                 raise ValueError(
                     tr("Al cambiar la identidad o el servidor, introduce de nuevo sus credenciales.")
                 )

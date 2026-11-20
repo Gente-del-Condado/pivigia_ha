@@ -1,5 +1,13 @@
 # Historial de versiones
 
+## 0.3.1 — 2026-11-20
+
+- Configuración permite elegir la cuenta que envía todas las alertas: SMTP manual o cuentas externas de Gmail, Outlook/Hotmail, Gente del Condado y proveedores personalizados, con habilitación explícita del envío y remitente autorizado.
+- SMTP externo con TLS verificado, destinos públicos fijados, contraseña u OAuth2 compartido con el buzón. La autorización de envío requiere consentimiento nuevo; Microsoft añade el permiso SMTP.Send. Se conservan los ajustes SMTP existentes y los tokens de cuentas que solo reciben.
+- Prueba de correo con selector independiente y resumen del remitente/servidor. Bloqueo ante cambios sin guardar; mensajes específicos para OAuth2, remitente, destinatario, TLS, contenido, límites y aceptación incierta. Escritura del destinatario de prueba ya no marca la configuración como modificada.
+- Cierre SMTP tras DATA sin transformar errores de QUIT en reenvíos; diagnóstico TLS de IMAP con su puerto correcto. Registros en el idioma del servicio y panel en español/inglés, sin respuestas privadas del proveedor.
+- Documentación de configuración, pruebas, proveedores, Home Assistant y mantenimiento actualizada en español e inglés. No se modifica la estructura de instalación ni los servidores de correo del usuario.
+
 ## 0.3.0 — 2026-11-20
 
 - Buzones de recepción directa SMTP y cuentas externas IMAP con las mismas reglas, análisis y destinos. Perfiles Gmail, Outlook/Hotmail, Gente del Condado y servidor propio.

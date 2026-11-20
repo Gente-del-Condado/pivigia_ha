@@ -21,6 +21,7 @@ from .diagnostics import TestEmail, analyze_image, send_test_email
 from .server import ENV_FIELDS, ServerSettings, deployment
 from .auth import AuthPolicy
 from .mail_accounts import restore_secrets
+from .mail_network import MailAccountBusy
 from .mail_reader import MailReader
 from .mail_api import install_mail_routes
 from . import __version__
@@ -47,10 +48,10 @@ def create_app(store=None, start_services=True, server_settings=None):
     store = store or Store()
     set_service_language(store.settings().language)
     running = server_settings or store.server_settings().effective()
-    worker = Worker(store)
+    mail_reader = MailReader(store)
+    worker = Worker(store, mail_reader=mail_reader)
     models = worker.detector.models
     streams = StreamManager(store, worker.detector)
-    mail_reader = MailReader(store)
     test_lock = threading.Lock()
     auth_policy = AuthPolicy()
 
@@ -236,12 +237,12 @@ def create_app(store=None, start_services=True, server_settings=None):
         try:
             test = TestEmail.model_validate_json(await read_body(request, 20_000))
         except ValueError:
-            raise HTTPException(422, tr("Indica un destinatario válido, un asunto sin saltos de línea y un texto de hasta 5000 caracteres.")) from None
+            raise HTTPException(422, tr("Selecciona una cuenta de salida válida e indica un destinatario válido, un asunto sin saltos de línea y un texto de hasta 5000 caracteres.")) from None
         settings = await asyncio.to_thread(store.settings)
-        if not settings.smtp_host or not settings.smtp_from:
-            raise HTTPException(422, tr("Guarda primero el servidor SMTP de salida y el remitente en Configuración."))
         try:
-            return await asyncio.to_thread(run_test, send_test_email, settings, test)
+            return await asyncio.to_thread(run_test, send_test_email, settings, test, worker.mail_sender)
+        except MailAccountBusy as error:
+            raise HTTPException(409, str(error)) from None
         except ValueError as error:
             raise HTTPException(422, str(error)) from None
 

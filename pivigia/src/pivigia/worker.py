@@ -14,8 +14,10 @@ from email.utils import formatdate, make_msgid
 
 from .detector import Detector
 from .notifications import alert_text, prepare_images, set_email_content
+from .mail_network import MailAccountError
+from .mail_sender import MailSender
 from .telegram import TelegramClient, TelegramError
-from .i18n import tr, service_language, use_language
+from .i18n import tr, service_language, use_language, translate_saved
 
 log = logging.getLogger(__name__)
 MAX_MIME_PARTS = 128
@@ -39,12 +41,14 @@ def parse_message(raw):
     return BytesParser(policy=policy.default.clone(message_factory=factory)).parsebytes(raw)
 
 
-def tls_error_description(error):
+def tls_error_description(error, *, imap=False):
     """Traduce códigos X.509 de OpenSSL sin copiar nombres ni mensajes del proveedor."""
     if isinstance(error, ssl.SSLCertVerificationError):
         code = getattr(error, "verify_code", None)
         # X509_V_ERR_HOSTNAME_MISMATCH e IP_ADDRESS_MISMATCH: nunca aceptar otro nombre.
         if code in {62, 64}:
+            if imap:
+                return tr("El certificado TLS no corresponde al servidor IMAP. Usa el nombre indicado por tu proveedor o corrige su certificado.")
             return tr("El certificado TLS no corresponde al nombre del servidor configurado. Usa el nombre SMTP indicado por tu proveedor o corrige el certificado del servidor.")
         if code == 9:
             return tr("El certificado TLS todavía no es válido. Revisa la fecha y hora del equipo y la vigencia del certificado del servidor.")
@@ -55,12 +59,37 @@ def tls_error_description(error):
         if code in {2, 20, 21}:
             return tr("No se pudo verificar la cadena del certificado TLS. Revisa los certificados intermedios del servidor y las autoridades de confianza del contenedor.")
         return tr("No se pudo verificar el certificado TLS. Revisa su nombre, vigencia y cadena de confianza; no desactives la verificación.")
+    if imap:
+        return tr("No se pudo establecer la conexión TLS con IMAP. Revisa el servidor y el puerto; normalmente se usa TLS directo en el puerto 993.")
     return tr("No se pudo establecer la conexión TLS. Revisa el puerto y la seguridad: normalmente SSL/TLS directo usa 465 y STARTTLS usa 587.")
+
+
+def smtp_error_description(error, *, test=False):
+    """Mensajes accionables sin reproducir respuestas ni datos privados del proveedor."""
+    if isinstance(error, MailAccountError):
+        return translate_saved(str(error))
+    if isinstance(error, smtplib.SMTPAuthenticationError):
+        return tr("El servidor rechazó las credenciales. Revisa usuario y contraseña SMTP.")
+    if isinstance(error, ssl.SSLError):
+        return tls_error_description(error)
+    if isinstance(error, (smtplib.SMTPSenderRefused, smtplib.SMTPRecipientsRefused)):
+        return smtp_refusal_description(error, test=test)
+    if isinstance(error, smtplib.SMTPNotSupportedError):
+        return tr("El servidor SMTP no ofrece la seguridad o autenticación solicitada. Revisa el puerto, STARTTLS y el método de acceso; no desactives TLS para resolverlo.")
+    if isinstance(error, smtplib.SMTPDataError):
+        if 400 <= error.smtp_code < 500:
+            return tr("El servidor SMTP aplazó la aceptación del mensaje. Revisa los límites de envío del proveedor y vuelve a intentarlo más tarde.")
+        return tr("El servidor SMTP rechazó el contenido del mensaje. Revisa sus límites de tamaño y sus políticas de envío.")
+    if isinstance(error, (TimeoutError, smtplib.SMTPServerDisconnected)):
+        return tr("Se agotó el tiempo o se interrumpió la conexión SMTP. No se pudo confirmar la aceptación; revisa el buzón de destino antes de repetir la prueba para evitar duplicados.")
+    if isinstance(error, ConnectionRefusedError):
+        return tr("No se pudo abrir la conexión SMTP. Revisa el servidor, el puerto y el cortafuegos.")
+    return tr("No se pudo enviar. Revisa el servidor SMTP de salida, puerto, seguridad, remitente y conexión.")
 
 
 def delivery_description(error):
     """Solo los errores construidos por PiVigia pueden aportar texto al historial."""
-    if isinstance(error, (DeliveryError, TelegramError)):
+    if isinstance(error, (DeliveryError, TelegramError, MailAccountError)):
         return str(error)
     if isinstance(error, smtplib.SMTPAuthenticationError):
         return tr("El servidor SMTP rechazó las credenciales.")
@@ -68,6 +97,8 @@ def delivery_description(error):
         return tls_error_description(error)
     if isinstance(error, (smtplib.SMTPSenderRefused, smtplib.SMTPRecipientsRefused)):
         return smtp_refusal_description(error)
+    if isinstance(error, smtplib.SMTPException):
+        return smtp_error_description(error)
     return tr("No se pudo completar la entrega. Revisa la configuración y la conexión.")
 
 
@@ -120,8 +151,12 @@ class DeliveryError(RuntimeError):
 
 
 class Worker:
-    def __init__(self, store, detector=None):
+    def __init__(self, store, detector=None, mail_reader=None):
         self.store = store
+        if mail_reader is None:
+            from .mail_reader import MailReader
+            mail_reader = MailReader(store)
+        self.mail_sender = MailSender(store, mail_reader)
         self.detector = detector or Detector(store.path / "models")
         self.stop_event = threading.Event()
         self.thread = None
@@ -294,17 +329,14 @@ class Worker:
             client.send_message(chat, caption)
         self.telegram_last_sent[destination] = time.monotonic()
 
-    @staticmethod
-    def forward(settings, destination, original, job, result, images=None):
+    def forward(self, settings, destination, original, job, result, images=None):
         with use_language(service_language(settings.language)):
-            Worker._forward(settings, destination, original, job, result, images)
+            self._forward(settings, destination, original, job, result, images)
 
-    @staticmethod
-    def _forward(settings, destination, original, job, result, images=None):
-        if not settings.smtp_host or not settings.smtp_from:
-            raise DeliveryError(tr("Configura el servidor SMTP de salida y el remitente"))
+    def _forward(self, settings, destination, original, job, result, images=None):
+        identity = self.mail_sender.identity(settings)
         message = EmailMessage()
-        message["From"] = settings.smtp_from
+        message["From"] = identity["sender"]
         message["To"] = destination
         subject = str(original.get("Subject", tr("(sin asunto)"))).replace("\r", "").replace("\n", "")
         message["Subject"] = "[PiVigia] " + subject[:200]
@@ -315,7 +347,7 @@ class Worker:
         if images is None:
             images = prepare_images(original, result, mailbox)
         set_email_content(message, job, original, result, mailbox, images)
-        Worker.send_email(settings, destination, message)
+        self.mail_sender.send(settings, destination, message)
 
     @staticmethod
     def send_email(settings, destination, message):
@@ -326,9 +358,12 @@ class Worker:
             smtp = smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=20, context=context)
         else:
             smtp = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20)
-        with smtp:
+        try:
             if settings.smtp_security == "starttls":
                 smtp.starttls(context=context)
             if settings.smtp_username:
                 smtp.login(settings.smtp_username, settings.smtp_password)
             smtp.send_message(message, from_addr=settings.smtp_from, to_addrs=[destination])
+        finally:
+            # DATA confirma la aceptación; un fallo posterior en QUIT no debe repetir el correo.
+            smtp.close()
